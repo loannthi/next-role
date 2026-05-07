@@ -157,6 +157,40 @@ def _upsert(backend: CompositeBackend, path: str, content: str) -> WriteResult:
     return WriteResult(path=path)
 
 
+def make_overwrite_file(backend: CompositeBackend) -> BaseTool:
+    """Build the `overwrite_file` tool, closed over the agent's backend."""
+
+    @tool
+    def overwrite_file(file_path: str, new_content: str) -> str:
+        """Replace the entire contents of a file (or create it if missing).
+
+        Use this when:
+        - You need to fully replace the body of an existing file.
+        - You need to write a file at a path that may or may not already exist
+          and you don't care which.
+
+        Prefer `edit_file` for small targeted edits or appends to existing
+        files where a unique anchor substring is enough — those are cheaper
+        and safer than a full overwrite.
+        Prefer `write_file` when you want to create a new file.
+
+        Args:
+            file_path: Absolute path.
+            new_content: The new full body of the file.
+
+        Returns:
+            Short confirmation string with the saved path and content length,
+            or `Error: ...` on failure.
+
+        """
+        result = _upsert(backend, file_path, new_content)
+        if result.error:
+            return f"Error overwriting {file_path}: {result.error}"
+        return f"Saved {file_path} ({len(new_content)} chars)"
+
+    return overwrite_file
+
+
 def make_parse_document(backend: CompositeBackend) -> BaseTool:
     """Build the `parse_document` tool, closed over the agent's backend."""
 

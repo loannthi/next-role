@@ -30,12 +30,24 @@ In Workspace > Files, processed markdown shows up at `/processed/<slug>.md` — 
 
 **Frontend store listing iterates configured `pathPrefixes`.** Original `fetchStoreFiles` queried a single namespace `[...namespacePrefix, assistantId]` — wrong shape for any agent whose backend uses per-route namespaces. Rewritten to derive namespace per `pathPrefix` by mirroring the backend's `CompositeBackend` route-stripping. Same helper (`resolveStoreLocation`) drives both list and write, so they always hit the same rows.
 
+## Robustness extensions (v1.1)
+
+The happy path above assumes LlamaParse succeeds and the user has nothing to add. Three follow-ups close the gaps.
+
+**Parse-failure recovery prefers `.txt` re-upload over pasted text.** When `parse_document` returns `Error: ...` (LlamaParse outage, malformed PDF, no markdown), the agent surfaces the failure and offers the user two choices: re-export the doc as `.txt` and re-upload (re-runs through `parse_document` with the same `save_as` slug, so `_upsert` overwrites cleanly), or paste the content directly into chat. The `.txt` route is recommended — paste forces the LLM to re-emit the entire body as output tokens (uncached, expensive), while `.txt` rides LlamaParse's `cost_optimizer` cheap tier and well within the free credits/month for solo use. `.txt` is already accepted by the upload route (`frontend/src/app/api/files/upload/route.ts:6`).
+
+**`overwrite_file(file_path, new_content)` exists for the paste fallback.** When the user does paste, the agent persists with `overwrite_file` rather than `write_file` + `edit_file`. The naive route — `read_file` to capture existing content, then `edit_file(old_string=<entire existing>, new_string=<new>)` — would force the LLM to regenerate the existing body as `old_string`. That's costly in output tokens and error-prone for long machine-generated strings (silent desync on whitespace/escapes). `overwrite_file` wraps `_upsert` directly and takes only the new content as input; works for both write-new (case 2: failed parse left no file) and overwrite-existing (case 3: bad login-page extraction) via `_upsert`'s try-write-then-edit fallback.
+
+**Downstream work gates on `/processed/` having a CV and a JD.** Research, custom-resume, interview-prep, and fit-analysis all read from `/processed/`, so before starting any of them the agent calls `list_files("/processed/")` and checks for one CV slug (`*-resume`) and one JD slug (`*-jd`). If either is missing it politely lists the input options (upload, URL for JDs, or paste) and waits for the user to provide the missing piece — rather than fabricating analysis from a one-sided view. The user can override by saying "just work on the resume" and the agent proceeds with the limitation noted.
+
+**Side-channel context lives at the tail of the same `/processed/<slug>.md`.** After a successful parse or extract, the agent asks once per artifact whether the user has more context — recruiter notes, team size, comp band, interview format that won't be in the JD/CV file. If yes, the agent appends a `## Additional context` section via `edit_file` using a small terminal anchor, so only the anchor + appended note re-flow as output tokens (not the whole CV). For multi-page additions, the agent redirects the user to upload as `.txt` instead.
+
 ## Files of interest
 
 | Concern | Path |
 |---|---|
 | Agent assembly + composite backend route map | `backend/app/career_agent/agents.py` |
-| `parse_document` and `list_files` tool factories + `_upsert` helper | `backend/app/career_agent/tools.py` |
+| `parse_document`, `list_files`, `overwrite_file` tool factories + `_upsert` helper | `backend/app/career_agent/tools.py` |
 | Per-call UTC datetime middleware | `backend/app/career_agent/middleware.py` |
 | Upload-handling block + reconciliation rules | `backend/app/career_agent/prompts.py` (`SYSTEM_PROMPT`) |
 | Tool + middleware unit tests (LlamaParse mocked) | `backend/tests/test_career_agent_tools.py`, `backend/tests/test_career_agent_middleware.py` |
@@ -78,4 +90,6 @@ In Workspace > Files, processed markdown shows up at `/processed/<slug>.md` — 
 6. **Edited-hint case.** Edit the textarea after upload to a name that doesn't exist on disk, send. Agent should call `list_files`, notice the mismatch, and ask one short clarifying question before parsing.
 7. **Overwrite case.** Re-upload the same file (or invoke `parse_document` with the same `save_as`). The processed file updates in place; `created_at` stays, `modified_at` advances.
 8. **No broken image refs.** Open the parsed markdown in Workspace > Files and check the browser Network tab — there should be **no 404s** for `page_X_image_Y.jpg`. The markdown should contain `[alt]` rather than `![alt](filename)`.
-9. **Tests.** `cd backend && uv run pytest tests/ -q` — must stay green; LlamaParse stays mocked.
+9. **Parse-failure recovery.** Force a parse failure (e.g. set `LLAMA_CLOUD_API_KEY=invalid`, `docker compose restart langgraph`). Upload a PDF; agent reports the error and offers `.txt` re-upload or paste. Restore the key, re-upload as `.txt` with the same intent → `parse_document` produces `/processed/<slug>.md`. Alternatively, choose the paste option → `overwrite_file` persists the same path. The trace shows **no** `write_file` call for doc body content.
+10. **Side-channel augmentation.** After any successful parse, the agent asks one short follow-up about extra context. Reply with a recruiter note → `read_file` reads only a small tail, then a single `edit_file` appends `## Additional context`. The original parsed body is unchanged.
+11. **Tests.** `cd backend && uv run pytest tests/ -q` — must stay green; LlamaParse stays mocked.

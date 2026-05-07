@@ -11,6 +11,7 @@ from backend.app.career_agent.tools import (
     CAREER_AGENT_DIR,
     make_extract_jd,
     make_list_files,
+    make_overwrite_file,
     make_parse_document,
 )
 from backend.app.career_agent.utils import load_subagents
@@ -100,6 +101,7 @@ career_agent = create_deep_agent(
         make_list_files(_backend),
         make_parse_document(_backend),
         make_extract_jd(_backend),
+        make_overwrite_file(_backend),
     ],
     subagents=load_subagents(CAREER_AGENT_DIR / "subagents.yaml"),
     backend=_backend,
