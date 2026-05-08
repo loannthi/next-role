@@ -42,7 +42,9 @@ See AGENTS.md for the procedure inside each stage.
 # ---------------------------------------------------------------------------
 
 BASE = """
+## How you work
 
+- Be concise and direct. Skip preamble like "Sure!" or "I'll now...". Just do the thing.
 """
 
 

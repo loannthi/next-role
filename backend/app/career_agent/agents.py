@@ -1,5 +1,6 @@
 """Define the career agent."""
 
+import deepagents.graph as _graph_mod
 import deepagents.middleware.filesystem as _fs_mw
 import deepagents.middleware.memory as _mem_mw
 import deepagents.middleware.skills as _skills_mw
@@ -15,12 +16,12 @@ from backend.app.career_agent.tools import (
     make_parse_document,
 )
 from backend.app.career_agent.utils import load_subagents
-from deepagents import HarnessProfile, create_deep_agent, register_harness_profile
+from deepagents import create_deep_agent
 from deepagents.backends import CompositeBackend, FilesystemBackend, StoreBackend
 
 
 def _apply_prompt_overrides() -> None:
-    """Replace the middleware prompts that deepagents injects into the system message.
+    """Replace the prompts that deepagents/langchain inject into the system message.
 
     Most middlewares read their constant by bare name at call time, so patching
     the module attribute is enough. `TodoListMiddleware` and `SubAgentMiddleware`
@@ -29,10 +30,20 @@ def _apply_prompt_overrides() -> None:
     time. Reassigning the module attribute after that does nothing; we must
     patch `__kwdefaults__` directly.
 
+    `BASE_AGENT_PROMPT` is patched here (rather than via
+    `HarnessProfile.base_system_prompt`) because the harness-profile overlay
+    also replaces declarative subagents' authored `system_prompt`, wiping out
+    the prompts defined in `subagents.yaml`. Patching the module constant
+    affects only the main agent's base, not subagent specs.
+
     Must run before `create_deep_agent()`. Process-global side effect — any
     other deep agent instantiated in the same Python process after this runs
     will also see these prompts.
     """
+    # `setattr` (rather than direct assignment) sidesteps ty's literal-type
+    # narrowing on the module-level `BASE_AGENT_PROMPT` constant.
+    setattr(_graph_mod, "BASE_AGENT_PROMPT", _prompts.BASE)  # noqa: B010
+
     _skills_mw.SKILLS_SYSTEM_PROMPT = _prompts.SKILLS
     _fs_mw._FILESYSTEM_SYSTEM_PROMPT_TEMPLATE = _prompts.FILESYSTEM  # noqa: SLF001
     _fs_mw.FILESYSTEM_SYSTEM_PROMPT = _prompts.FILESYSTEM.format(
@@ -52,20 +63,6 @@ _apply_prompt_overrides()
 
 
 _MODEL = "bedrock_converse:global.anthropic.claude-sonnet-4-6"
-
-_MY_PROFILE = HarnessProfile(base_system_prompt=_prompts.BASE)
-for _provider in (
-    "anthropic",
-    "bedrock",
-    "bedrock_converse",
-    "azure_openai",
-    "openai",
-    "openrouter",
-    "ollama",
-    "google_genai",
-    "google_vertexai",
-):
-    register_harness_profile(_provider, _MY_PROFILE)
 
 
 _backend = CompositeBackend(
