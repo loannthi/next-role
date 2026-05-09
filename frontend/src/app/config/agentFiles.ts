@@ -13,18 +13,11 @@ export const AGENT_FILE_SOURCES: Record<string, AgentFileSources> = {
   career_agent: {
     store: {
       namespacePrefix: ["career_agent"],
-      pathPrefixes: [
-        "/memory/",
-        "/processed/",
-        "/research/",
-        "/interview_prep/",
-        "/large_tool_results/",
-        "/workspace/",
-      ],
+      pathPrefixes: ["/memory/", "/processed/", "/research/", "/interview_coach/", "/workspace/"],
     },
     disk: {
       root: "backend/app/career_agent",
-      includeDirs: ["upload"],
+      includeDirs: ["upload", "tailored_resume", "interview_battlecard"],
     },
   },
 };
