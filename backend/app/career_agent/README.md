@@ -12,14 +12,12 @@ The agent is configured by files:
 
 ```
 career_agent/
-├── AGENTS.md                    # Brand voice & style guide
-├── subagents.yaml               # Subagent definitions
+├── AGENTS.md                    # Per-stage procedure (loaded as memory)
+├── subagents.yaml               # Subagent definitions (hiring-recon, resume-tailor, interview-coach)
 ├── skills/
-│   ├── custom-resume/
-│   │   └── SKILL.md             # Customize resume
-│   └── interview-prep/
-│       └── SKILL.md             # Interview preparation
-└── tools.py                     # Tools for the agents and subagents
+│   └── interview-battlecard/
+│       └── SKILL.md             # Day-of one-pager workflow
+├── tools.py                     # Tools for the agents and subagents
 └── utils.py                     # Utilities
 ```
 
@@ -51,18 +49,18 @@ subagents=[
 
 **Flow:**
 
-1. User uploads CV and optional JD → saves to `upload/`
-2. Agent processes the uploaded documents → saves to `/processed/`
-3. Agent uderstands task → loads relevant skill
-4. Agent plans tasks → uses `write_todos` tool
-5. Delegates research to the subagent → saves to `/research/`
-6. Generates custom resume → saves to `custom_resume/`
-7. Generates interview preparation → saves to `/interview_prep/`
-8. Generates interview cheat sheet → saves to `interview_cheat_sheet/`
+1. Agent asks user for resume, JD, prep timeline, and any extra context.
+2.1. User uploads resume and optional JD → saves to `upload/`.
+2.2. Agent processes the uploaded documents → saves to `/processed/<slug>.md`. Persists intake answers to `/processed/<resume>-<jd>-intake.md`. Reads both processed files in full so it has substance for delegating downstream stages.
+3. Delegates to `hiring-recon` subagent → company + role intel + match analysis → saves to `/research/<resume>/<jd>.md`.
+4.1. Delegates to `resume-tailor` subagent → tailored resume → saves to `tailored_resume/<resume>/<jd>.md`.
+4.2. In parallel with 4.1, delegates to `interview-coach` subagent → structured prep doc with self-introduction + per-round STAR stories → saves to `/interview_coach/<resume>/<jd>.md`.
+5. Agent loads `skills/interview-battlecard/SKILL.md`, reads the tailored resume + interview-coach prep + research report, then writes a one-page-per-round battlecard → saves to `interview_battlecard/<resume>/<jd>.md`.
+
 
 ## File Upload (v1)
 
-Users upload raw CV / JD files (PDF, DOC, DOCX, TXT, MD; up to 10 MB each) from
+Users upload raw resume / JD files (PDF, DOC, DOCX, TXT, MD; up to 10 MB each) from
 the frontend in two places:
 
 - **Chat composer** — paperclip icon in the message input.
@@ -82,26 +80,30 @@ Re-uploading the same filename overwrites. Scoping is global per the layout abov
 ## File Structure
 
 ```
-upload/
-└── Senior AI Engineer - Tam NGUYEN.pdf     # Uploaded resume
-└── AWS AI Solution Engineer.pdf            # Uploaded JD
+upload/                                                       # FilesystemBackend
+└── Senior AI Engineer - Tam NGUYEN.pdf                       # Uploaded resume
+└── AWS AI Solution Engineer.pdf                              # Uploaded JD
 
-/processed/
-└── tam-nguyen-senior-ai-engineer.md        # Processed resume
-└── aws-ai-solution-engineer.md             # Processed JD
+/processed/                                                   # StoreBackend
+└── tam-nguyen-senior-ai-engineer-resume.md                   # Processed resume
+└── aws-ai-solution-engineer-jd.md                            # Processed JD
+└── tam-nguyen-senior-ai-engineer-resume-aws-ai-solution-engineer-jd-intake.md  # Intake (per resume×JD pair)
 
-/research/
-└── aws-ai-solution-engineer.md             # Research note
+/research/                                                    # StoreBackend
+└── tam-nguyen-senior-ai-engineer-resume/
+    └── aws-ai-solution-engineer-jd.md                        # hiring-recon report
 
-custom_resume/
-└── tam-nguyen-senior-ai-engineer/
-    └── aws-ai-solution-engineer.pdf        # tailored resume for specific job
+tailored_resume/                                              # FilesystemBackend
+└── tam-nguyen-senior-ai-engineer-resume/
+    └── aws-ai-solution-engineer-jd.md                        # resume-tailor output
 
-/interview_prep/
-└── tam-nguyen-senior-ai-engineer/
-    ├── aws-ai-solution-engineer.md         # interview preperation
+/interview_coach/                                             # StoreBackend
+└── tam-nguyen-senior-ai-engineer-resume/
+    └── aws-ai-solution-engineer-jd.md                        # interview-coach output
 
-interview_cheat_sheet/
-└── tam-nguyen-senior-ai-engineer/
-    ├── aws-ai-solution-engineer.pdf        # interview cheat sheet
+interview_battlecard/                                         # FilesystemBackend
+└── tam-nguyen-senior-ai-engineer-resume/
+    └── aws-ai-solution-engineer-jd.md                        # day-of cheat sheet
 ```
+
+Note: `.md` outputs reflect the current dev phase. PDF rendering for the tailored resume and battlecard is a future phase, which is also why those two artifacts use FilesystemBackend (so the eventual binary outputs land on disk, not in Postgres).

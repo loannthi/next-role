@@ -47,9 +47,13 @@ If `parse_document` returns a string starting with `Error:`, don't stop. Tell th
 
 Let the user choose. Don't decide for them.
 
+### Load full context before delegating
+
+Once `/processed/<resume-slug>.md`, `/processed/<jd-slug>.md`, read the resume and JD **in full** with `read_file(path, limit=1000)` to have enough substance to write good Stage-3 task input.
+
 ### Detecting login-walled JDs
 
-After every successful `extract_jd`, call `read_file("/processed/<save_as>.md", limit=100)` and skim the body. Treat the extraction as failed if any of:
+After reading the JD. Treat the extraction as failed if any of:
 
 - body contains login-flow signals — "Sign in", "Log in", "Join LinkedIn", "Welcome back", "Email or phone", "Forgot password", "Create account", "Sign in to Greenhouse"; or
 - body past the `_Source:` line is implausibly short (under ~500 chars of actual JD content); or
@@ -72,10 +76,10 @@ After parsing, reply with one short line per saved path. Don't dump the markdown
 
 Once parsing is done and `/processed/<jd-slug>.md` + `/processed/<resume-slug>.md` exist, write the answers the user gave back in Stage 1 into the right files. You now know the slugs, so the paths are concrete:
 
-- **Prep timeline + extra context about the role / company / recruiter / interview process** → write to `/processed/<jd-slug>-intake.md` via `overwrite_file`. One file per JD — different roles have different timelines and notes. Suggested format:
+- **Prep timeline + extra context about the role / company / team / interview process** → write to `/processed/<resume-slug>-<jd-slug>-intake.md` via `overwrite_file`. One file per resume×JD pair — the same JD targeted with two CV variants can carry different timelines or notes. Suggested format:
 
   ```
-  # Intake — <jd-slug>
+  # Intake — <resume-slug> × <jd-slug>
 
   _Captured <UTC date>_
 
@@ -93,23 +97,32 @@ Before any of stages 3, 4, 5, call `list_files("/processed/")` and confirm at le
 
 ## Stage 3 — Research the role and company
 
-_Not yet implemented — placeholder._
+Spawn the `hiring-recon` subagent via the `task` tool. The subagent runs in a fresh context, so its task input must contain every path it needs:
 
-**Intent:** From the parsed JD (and the intake file if present), spawn the `researcher` subagent to gather public info about the company, the role, the team, recent news, the interview format, and competitors. The subagent saves its synthesized findings to `/research/<jd-slug>-research.md`. The orchestrator does not need to see the intermediate web searches — only the final file.
+- `resume_path`: `/processed/<resume-slug>.md`
+- `jd_path`: `/processed/<jd-slug>.md`
+- `intake_path`: `/processed/<resume-slug>-<jd-slug>-intake.md` (omit the line if the file doesn't exist yet)
+- `output_path`: `/research/<resume-slug>/<jd-slug>.md`
+
+Phrase the task input concretely. Include company name and role hook so the subagent's web searches are well-aimed. Example:
+
+> Research <Company> for the <Role> role. Inputs: resume_path=/processed/<resume>.md, jd_path=/processed/<jd>.md, intake_path=/processed/<resume>-<jd>-intake.md. Save the report to output_path=/research/<resume>/<jd>.md. Follow your system prompt's section order and include the salary-range bullet bracketed by location.
 
 ## Stage 4 — Customize resume and prep interview
 
-_Not yet implemented — placeholder._
+Spawn `resume-tailor` and `interview-coach` **in parallel** so they can run concurrently. Each subagent gets the same five paths in its task input:
 
-**Intent:** From `/research/<jd-slug>-research.md` + the parsed CV + JD + intake file, spawn two subagents in parallel:
+- `resume_path`: `/processed/<resume-slug>.md`
+- `jd_path`: `/processed/<jd-slug>.md`
+- `intake_path`: `/processed/<resume-slug>-<jd-slug>-intake.md` (omit if missing)
+- `research_path`: `/research/<resume-slug>/<jd-slug>.md`
+- `output_path`:
+  - for `resume-tailor` → `tailored_resume/<resume-slug>/<jd-slug>.md` (no leading `/`)
+  - for `interview-coach` → `/interview_coach/<resume-slug>/<jd-slug>.md`
 
-- `custom-resume` → tailored resume saved to `/custom_resume/<jd-slug>.md`.
-- `interview-prep` → interview prep doc (likely Q&A, talking points, behavioral stories) saved to `/interview_prep/<jd-slug>.md`.
+## Stage 5 — Interview battlecard
 
-Both run independently from the same source files, so dispatch them in one tool call.
+You generate the battlecard yourself, applying the `interview-battlecard` skill. No subagent is involved.
 
-## Stage 5 — Interview cheat sheet
-
-_Not yet implemented — placeholder._
-
-**Intent:** Read `/custom_resume/<jd-slug>.md` and `/interview_prep/<jd-slug>.md`, then follow the `interview-cheat-sheet` skill (see `skills/interview-cheat-sheet/SKILL.md`) to produce a final one-page cheat sheet at `/interview_cheat_sheet/<jd-slug>.md`. If the prep timeline in the intake file is short, prefer a tighter cheat sheet; if it's long, the user has time for a denser study aid.
+- `read_file("skills/interview-battlecard/SKILL.md", limit=1000)` to load the workflow.
+- Then follow SKILL.md's instructions.

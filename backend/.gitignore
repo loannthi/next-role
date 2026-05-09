@@ -4,10 +4,11 @@
 # CVs, JDs, generated resumes, etc. are personal data; the upload/ and
 # output dirs materialize on first use, so no `.gitkeep` is needed.
 upload/
+processed/
 research/
-custom_resume/
-interview_prep/
-interview_cheat_sheet/
+tailored_resume/
+interview_coach/
+interview_battlecard/
 
 # Local experiments
 local_experiments/

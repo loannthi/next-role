@@ -3,7 +3,7 @@
 from pathlib import Path
 
 import yaml
-from backend.app.career_agent.tools import web_search
+from backend.app.career_agent.tools import web_extract, web_search
 
 
 def load_subagents(config_path: Path) -> list:
@@ -17,6 +17,7 @@ def load_subagents(config_path: Path) -> list:
     # Map tool names to actual tool objects
     available_tools = {
         "web_search": web_search,
+        "web_extract": web_extract,
     }
 
     with config_path.open() as f:

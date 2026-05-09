@@ -77,8 +77,8 @@ _backend = CompositeBackend(
         "/research/": StoreBackend(
             namespace=lambda _: ("career_agent", "research"),
         ),
-        "/interview_prep/": StoreBackend(
-            namespace=lambda _: ("career_agent", "interview_prep"),
+        "/interview_coach/": StoreBackend(
+            namespace=lambda _: ("career_agent", "interview_coach"),
         ),
         "/large_tool_results/": StoreBackend(
             namespace=lambda _: ("career_agent", "large_tool_results"),
