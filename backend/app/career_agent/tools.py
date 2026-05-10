@@ -27,7 +27,7 @@ def _strip_image_filenames(markdown: str) -> str:
 @tool
 def web_search(
     query: str,
-    search_depth: Literal["basic", "advanced", "fast", "ultra-fast"] = "advanced",
+    search_depth: Literal["basic", "advanced", "fast", "ultra-fast"] = "basic",
     topic: Literal["general", "news", "finance"] = "general",
     max_results: int = 5,
 ) -> dict:
@@ -62,7 +62,7 @@ def web_search(
 @tool
 def web_extract(
     urls: list[str] | str,
-    extract_depth: Literal["basic", "advanced"] = "advanced",
+    extract_depth: Literal["basic", "advanced"] = "basic",
     content_format: Literal["markdown", "text"] = "markdown",
 ) -> dict:
     """Search the web for current information.
@@ -260,7 +260,7 @@ def _tavily_extract_one(url: str) -> tuple[str, str]:
     from tavily import TavilyClient
 
     client = TavilyClient()
-    response = client.extract(urls=url, extract_depth="advanced", format="markdown")
+    response = client.extract(urls=url, extract_depth="basic", format="markdown")
     results = response.get("results") or []
     if not results:
         msg = f"Tavily returned no results for {url}"
