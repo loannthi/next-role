@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   AlertCircle,
@@ -57,14 +57,34 @@ export const SubAgentIndicator = React.memo<SubAgentIndicatorProps>(
   ({ subAgent, onClick, isExpanded = true }) => {
     const statusMeta = getSubAgentStatusMeta(subAgent.status);
     const StatusIcon = statusMeta.icon;
+    const isActive = subAgent.status === "active";
+
+    // Mirror ToolCallBox: pointerdown for responsiveness under main-thread
+    // pressure (Safari mid-stream), click as keyboard fallback, deduped by
+    // timestamp so a single tap doesn't toggle twice.
+    const lastPointerToggleRef = useRef(0);
+    const handlePointerToggle = useCallback(() => {
+      lastPointerToggleRef.current = performance.now();
+      onClick();
+    }, [onClick]);
+    const handleClickToggle = useCallback(() => {
+      if (performance.now() - lastPointerToggleRef.current < 300) return;
+      onClick();
+    }, [onClick]);
 
     return (
-      <div className="hover:border-primary/25 w-fit max-w-[70vw] overflow-hidden rounded-2xl border border-border bg-surface-raised shadow-sm outline-none transition-colors">
+      <div
+        className={cn(
+          "hover:border-primary/25 relative w-fit max-w-[70vw] overflow-hidden rounded-2xl border border-border bg-surface-raised shadow-sm outline-none transition-colors",
+          isActive && "tool-running-sweep"
+        )}
+      >
         <Button
           variant="ghost"
           size="sm"
-          onClick={onClick}
-          className="flex h-auto w-full items-center justify-between gap-3 border-none px-3 py-3 text-left shadow-none outline-none transition-colors duration-200 hover:bg-transparent"
+          onPointerDown={handlePointerToggle}
+          onClick={handleClickToggle}
+          className="relative z-10 flex h-auto w-full items-center justify-between gap-3 border-none px-3 py-3 text-left shadow-none outline-none transition-colors duration-200 hover:bg-transparent"
         >
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <span className="bg-primary/10 flex size-8 shrink-0 items-center justify-center rounded-xl text-primary">

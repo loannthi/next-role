@@ -487,6 +487,14 @@ button {
     transparent
   );
   animation: toolSweep 1.8s ease-in-out infinite;
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tool-running-sweep::after {
+    animation: none;
+  }
 }
 
 /* Custom scrollbar styles */

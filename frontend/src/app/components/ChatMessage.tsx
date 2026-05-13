@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useCallback } from "react";
+import React, { useMemo, useState, useCallback, useRef } from "react";
 import { SubAgentIndicator } from "@/app/components/SubAgentIndicator";
 import { ToolCallBox } from "@/app/components/ToolCallBox";
 import { MarkdownContent } from "@/app/components/MarkdownContent";
@@ -38,10 +38,20 @@ export const ChatMessage = React.memo<ChatMessageProps>(
     const hasContent = messageContent && messageContent.trim() !== "";
     const hasToolCalls = toolCalls.length > 0;
 
+    // Cache nested-tool-call objects (per subagent's tool call) by id so that
+    // ToolCallBox.memo short-circuits for completed nested tools while the
+    // streaming one alone passes a fresh reference.
+    const nestedToolCallCacheRef = useRef(new Map<string, ToolCall>());
+
     // Subscribe to the SDK's per-subagent state so the box stays populated
     // after the run reconciles with thread history (which only persists the
     // parent `task` tool call). `stream.subagents` is a Map kept up to date
-    // by SubagentManager for the lifetime of the React state.
+    // by SubagentManager for the lifetime of the React state. We sample via
+    // `toolCalls` (throttled transitively by the messages snapshot in
+    // useChat) instead of `stream.subagents` directly — the SDK exposes it
+    // as a getter that returns a fresh reference on every read, which would
+    // re-run this memo on every token and starve the main thread under any
+    // high-rate streaming.
     const sdkSubagents: any[] = useMemo(() => {
       if (!stream?.getSubagentsByMessage || !message.id) return [];
       try {
@@ -49,7 +59,7 @@ export const ChatMessage = React.memo<ChatMessageProps>(
       } catch {
         return [];
       }
-    }, [stream, message.id, stream?.subagents]);
+    }, [stream, message.id, toolCalls]);
 
     const subAgents = useMemo(() => {
       const sdkById = new Map<string, any>(sdkSubagents.map((s) => [s.id, s]));
@@ -125,16 +135,29 @@ export const ChatMessage = React.memo<ChatMessageProps>(
                   const state = tc.state ?? (resultStr !== undefined ? "completed" : "pending");
                   const status: ToolCall["status"] =
                     state === "error" ? "error" : state === "completed" ? "completed" : "pending";
-                  return {
-                    id:
-                      tc.id ||
-                      call.id ||
-                      `${toolCall.id}-${call.name}-${Math.random().toString(36).slice(2)}`,
+                  const id =
+                    tc.id ||
+                    call.id ||
+                    `${toolCall.id}-${call.name}-${Math.random().toString(36).slice(2)}`;
+                  // Cache only finalized nested tools — pending ones must keep
+                  // emitting fresh refs so streaming tokens render live.
+                  if (status === "completed" || status === "error") {
+                    const cached = nestedToolCallCacheRef.current.get(id);
+                    if (cached && cached.status === status && cached.result === resultStr) {
+                      return cached;
+                    }
+                  }
+                  const next: ToolCall = {
+                    id,
                     name: call.name,
                     args: (call.args ?? {}) as Record<string, unknown>,
                     result: resultStr,
                     status,
-                  } as ToolCall;
+                  };
+                  if (status === "completed" || status === "error") {
+                    nestedToolCallCacheRef.current.set(id, next);
+                  }
+                  return next;
                 })
             : undefined;
 

@@ -79,6 +79,62 @@ export function useChat({
     filterSubagentMessages: true,
   } as any) as unknown as UseStream<StateType>;
 
+  // Hot-streaming detection: at least one running subagent has a pending
+  // tool call (its LLM is streaming tool-call args token-by-token). This is
+  // when `stream.messages` and `stream.subagents` churn at the highest rate
+  // — multiple subagents emitting in parallel can saturate the main thread
+  // and starve user input. While this is true we sample stream state at
+  // 80 ms instead of on every token; the trigger is tool-name agnostic so
+  // it covers any current or future subagent that streams long tool args.
+  let isHotStreaming = false;
+  if (stream.isLoading) {
+    const subagentsMap = (stream as unknown as { subagents?: unknown }).subagents;
+    const iter =
+      subagentsMap && typeof (subagentsMap as { values?: unknown }).values === "function"
+        ? ((subagentsMap as { values: () => Iterable<any> }).values() as Iterable<any>)
+        : null;
+    if (iter) {
+      for (const s of iter) {
+        if (s?.status !== "running" || !Array.isArray(s?.toolCalls)) continue;
+        if (s.toolCalls.some((tc: { state?: string }) => tc?.state === "pending")) {
+          isHotStreaming = true;
+          break;
+        }
+      }
+    }
+  }
+
+  // Throttled snapshot of `stream.messages`. Inside the hot window we sample
+  // the latest array at 80 ms via `setInterval`; outside it we pass through
+  // `stream.messages` directly so non-streaming updates remain instant.
+  // Downstream consumers (e.g. ChatInterface's message-processing useMemo,
+  // and every derived tool-call array) depend on this snapshot, so their
+  // expensive rebuilds run at ~12 fps during the hot window.
+  //
+  // Subtlety: both `stream.messages` and `stream.subagents` are exposed by
+  // the SDK as getters that return a fresh reference on every read. We
+  // therefore CANNOT use them as useEffect deps (an unstable dep + setState
+  // inside the effect = infinite re-render loop). The effect below depends
+  // only on `isHotStreaming` (a derived boolean that flips at most a few
+  // times per run); the ref pulls the latest messages at sample time.
+  const messagesRef = useRef(stream.messages);
+  messagesRef.current = stream.messages;
+  const [throttledMessages, setThrottledMessages] = useState(stream.messages);
+  useEffect(() => {
+    if (!isHotStreaming) return;
+    // Sync immediately on entry so consumers don't see a stale snapshot.
+    setThrottledMessages(messagesRef.current);
+    const id = window.setInterval(() => {
+      setThrottledMessages(messagesRef.current);
+    }, 80);
+    return () => {
+      window.clearInterval(id);
+      // Final flush so the last tokens land instantly when streaming ends.
+      setThrottledMessages(messagesRef.current);
+    };
+  }, [isHotStreaming]);
+  const messagesSnapshot = isHotStreaming ? throttledMessages : stream.messages;
+
   const sendMessage = useCallback(
     (content: string) => {
       const newMessage: Message = { id: uuidv4(), type: "human", content };
@@ -374,7 +430,8 @@ export function useChat({
     setInput,
     appendUploadNote,
     focusComposerNonce,
-    messages: stream.messages,
+    messages: messagesSnapshot,
+    isHotStreaming,
     isLoading: stream.isLoading,
     isThreadLoading: stream.isThreadLoading,
     interrupt: stream.interrupt,

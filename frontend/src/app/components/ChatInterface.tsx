@@ -17,11 +17,12 @@ interface ChatInterfaceProps {
 export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-  const { scrollRef, contentRef } = useStickToBottom();
+  const { scrollRef, contentRef, scrollToBottom } = useStickToBottom();
 
   const {
     stream,
     messages,
+    isHotStreaming,
     ui,
     isLoading,
     isThreadLoading,
@@ -33,6 +34,21 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
     setInput,
     focusComposerNonce,
   } = useChatContext();
+
+  // Re-engage sticky scroll whenever a throttled (hot) streaming window
+  // ends. During the hot window the user can lose the bottom-lock — a
+  // stray scroll-wheel tick, or the library reading a batched content jump
+  // as an escape — and any output that follows would otherwise render
+  // below the fold until the user manually scrolls. This transition is the
+  // right moment to recapture, regardless of which agent or step produced
+  // the window.
+  const prevHotRef = useRef(isHotStreaming);
+  useEffect(() => {
+    if (prevHotRef.current && !isHotStreaming) {
+      scrollToBottom();
+    }
+    prevHotRef.current = isHotStreaming;
+  }, [isHotStreaming, scrollToBottom]);
 
   const submitDisabled = isLoading || !assistant;
 
@@ -95,6 +111,16 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
     [handleSubmit, submitDisabled]
   );
 
+  // Cache stable references for finalized ToolCall objects and per-message
+  // toolCall arrays. While streaming, each token produces a new `messages`
+  // reference, which previously rebuilt every ToolCall fresh and defeated the
+  // React.memo on ChatMessage/ToolCallBox. We keep finalized entries cached by
+  // id and only emit a new array reference for messages whose entries actually
+  // changed — the streaming AI message gets a fresh reference so its tool box
+  // re-renders and shows live tokens; all earlier messages stay stable.
+  const toolCallCacheRef = useRef(new Map<string, ToolCall>());
+  const toolCallArrayCacheRef = useRef(new Map<string, ToolCall[]>());
+
   // TODO: can we make this part of the hook?
   const processedMessages = useMemo(() => {
     /*
@@ -139,12 +165,11 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
           }) => {
             const name = toolCall.function?.name || toolCall.name || toolCall.type || "unknown";
             const args = toolCall.function?.arguments || toolCall.args || toolCall.input || {};
-            return {
-              id: toolCall.id || `tool-${Math.random()}`,
-              name,
-              args,
-              status: interrupt ? "interrupted" : ("pending" as const),
-            } as ToolCall;
+            const id = toolCall.id || `tool-${Math.random()}`;
+            const status: ToolCall["status"] = interrupt ? "interrupted" : "pending";
+            // Pending tools: always fresh reference so the streaming box re-renders.
+            // Cache hit happens later when the matching ToolMessage flips status.
+            return { id, name, args, status } as ToolCall;
           }
         );
         messageMap.set(message.id!, {
@@ -161,11 +186,19 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
           if (toolCallIndex === -1) {
             continue;
           }
-          data.toolCalls[toolCallIndex] = {
-            ...data.toolCalls[toolCallIndex],
-            status: "completed" as const,
-            result: extractStringFromMessageContent(message),
-          };
+          const result = extractStringFromMessageContent(message);
+          const cached = toolCallCacheRef.current.get(toolCallId);
+          if (cached && cached.status === "completed" && cached.result === result) {
+            data.toolCalls[toolCallIndex] = cached;
+          } else {
+            const next: ToolCall = {
+              ...data.toolCalls[toolCallIndex],
+              status: "completed" as const,
+              result,
+            };
+            toolCallCacheRef.current.set(toolCallId, next);
+            data.toolCalls[toolCallIndex] = next;
+          }
           break;
         }
       } else if (message.type === "human") {
@@ -176,13 +209,39 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
       }
     });
     const processedArray = Array.from(messageMap.values());
-    return processedArray.map((data, index) => {
+    // Reuse the previous toolCalls array reference when none of the entries
+    // changed identity, so React.memo on ChatMessage short-circuits for messages
+    // that aren't actively streaming.
+    const arrayCache = toolCallArrayCacheRef.current;
+    const seenMessageIds = new Set<string>();
+    const result = processedArray.map((data, index) => {
       const prevMessage = index > 0 ? processedArray[index - 1].message : null;
+      const messageId = data.message.id;
+      let toolCalls = data.toolCalls;
+      if (messageId) {
+        seenMessageIds.add(messageId);
+        const cachedArray = arrayCache.get(messageId);
+        const sameRefs =
+          cachedArray &&
+          cachedArray.length === toolCalls.length &&
+          cachedArray.every((tc, i) => tc === toolCalls[i]);
+        if (sameRefs) {
+          toolCalls = cachedArray!;
+        } else {
+          arrayCache.set(messageId, toolCalls);
+        }
+      }
       return {
-        ...data,
+        message: data.message,
+        toolCalls,
         showAvatar: data.message.type !== prevMessage?.type,
       };
     });
+    // Drop entries for messages that no longer exist (e.g. thread switch).
+    for (const id of arrayCache.keys()) {
+      if (!seenMessageIds.has(id)) arrayCache.delete(id);
+    }
+    return result;
   }, [messages, interrupt]);
 
   // Parse out any action requests or review configs from the interrupt
@@ -198,6 +257,22 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
     return new Map(reviewConfigs.map((rc: ReviewConfig) => [rc.actionName, rc]));
   }, [interrupt]);
 
+  // Bucket UI items by message_id once per ui change so that ChatMessage gets
+  // a stable array reference per message instead of a fresh `.filter()` result
+  // on every render.
+  const uiByMessageId = useMemo(() => {
+    const buckets = new Map<string, any[]>();
+    if (!ui) return buckets;
+    for (const u of ui as any[]) {
+      const mid = u?.metadata?.message_id;
+      if (!mid) continue;
+      const existing = buckets.get(mid);
+      if (existing) existing.push(u);
+      else buckets.set(mid, [u]);
+    }
+    return buckets;
+  }, [ui]);
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden bg-canvas">
       <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain" ref={scrollRef}>
@@ -209,9 +284,7 @@ export const ChatInterface = React.memo<ChatInterfaceProps>(({ assistant }) => {
           ) : (
             <>
               {processedMessages.map((data, index) => {
-                const messageUi = ui?.filter(
-                  (u: any) => u.metadata?.message_id === data.message.id
-                );
+                const messageUi = data.message.id ? uiByMessageId.get(data.message.id) : undefined;
                 const isLastMessage = index === processedMessages.length - 1;
                 return (
                   <ChatMessage

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useRef } from "react";
 import {
   Bot,
   ChevronDown,
@@ -54,8 +54,20 @@ function getToolIcon(name: string): LucideIcon {
 function parseToolError(result: unknown): { code?: string; message?: string } | null {
   if (result == null) return null;
 
-  const text = typeof result === "string" ? result : JSON.stringify(result);
-  if (!text) return null;
+  // Cap inspection at 256 chars — error markers always appear at the start, and
+  // a long streaming payload here would force a JSON.stringify of the full body.
+  const raw =
+    typeof result === "string"
+      ? result
+      : (() => {
+          try {
+            return JSON.stringify(result);
+          } catch {
+            return "";
+          }
+        })();
+  if (!raw) return null;
+  const text = raw.length > 256 ? raw.slice(0, 256) : raw;
   const trimmed = text.trim();
   const startsWithError = /^(error|exception|failed)\b\s*:?\s*/i.test(trimmed);
   if (!startsWithError) return null;
@@ -134,9 +146,19 @@ function getStatusMeta(
 
 function previewValue(value: unknown): string | null {
   if (value == null) return null;
-  const text = typeof value === "string" ? value : JSON.stringify(value);
-  if (!text) return null;
-  return text.length > 96 ? `${text.slice(0, 96)}...` : text;
+  if (typeof value === "string") {
+    return value.length > 96 ? `${value.slice(0, 96)}...` : value;
+  }
+  // For objects/arrays we only need the first ~96 chars of the stringified form.
+  // JSON.stringify on a large streaming payload here is the dominant cost during
+  // streaming, so guard with try/catch and slice the result.
+  try {
+    const text = JSON.stringify(value);
+    if (!text) return null;
+    return text.length > 96 ? `${text.slice(0, 96)}...` : text;
+  } catch {
+    return null;
+  }
 }
 
 export const ToolCallBox = React.memo<ToolCallBoxProps>(
@@ -163,10 +185,19 @@ export const ToolCallBox = React.memo<ToolCallBoxProps>(
     }, [toolCall]);
 
     const ToolIcon = useMemo(() => getToolIcon(name), [name]);
-    const parsedError = useMemo(() => parseToolError(result), [result]);
+    // While the tool is streaming (`pending`), args grows by one token at a time.
+    // Skip parseToolError + previewValue until completion — both call JSON.stringify
+    // and would re-run on every token despite only feeding the collapsed header.
+    const parsedError = useMemo(
+      () => (status === "pending" ? null : parseToolError(result)),
+      [result, status]
+    );
     const visualStatus = parsedError ? "error" : status;
     const statusMeta = useMemo(() => getStatusMeta(status, parsedError), [status, parsedError]);
-    const preview = useMemo(() => previewValue(result) ?? previewValue(args), [args, result]);
+    const preview = useMemo(() => {
+      if (status === "pending") return null;
+      return previewValue(result) ?? previewValue(args);
+    }, [args, result, status]);
 
     const statusIcon = useMemo(() => {
       switch (status) {
@@ -189,7 +220,17 @@ export const ToolCallBox = React.memo<ToolCallBoxProps>(
       statusIcon
     );
 
-    const toggleExpanded = useCallback(() => {
+    // `onPointerDown` fires before the OS click-eating window during heavy
+    // main-thread work (Safari, mid-stream). Keep `onClick` for keyboard
+    // activation (Enter/Space → only fires click), and dedupe with a timestamp
+    // so a single tap doesn't toggle twice.
+    const lastPointerToggleRef = useRef(0);
+    const handlePointerToggle = useCallback(() => {
+      lastPointerToggleRef.current = performance.now();
+      setIsExpanded((prev) => !prev);
+    }, []);
+    const handleClickToggle = useCallback(() => {
+      if (performance.now() - lastPointerToggleRef.current < 300) return;
       setIsExpanded((prev) => !prev);
     }, []);
 
@@ -214,7 +255,8 @@ export const ToolCallBox = React.memo<ToolCallBoxProps>(
         <Button
           variant="ghost"
           size="sm"
-          onClick={toggleExpanded}
+          onPointerDown={handlePointerToggle}
+          onClick={handleClickToggle}
           className={cn(
             "relative z-10 flex h-auto w-full items-center justify-between gap-3 border-none px-3 py-3 text-left shadow-none outline-none focus-visible:ring-1 focus-visible:ring-primary/40 focus-visible:ring-offset-0 disabled:cursor-default"
           )}
