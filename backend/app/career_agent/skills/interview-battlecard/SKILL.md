@@ -13,13 +13,13 @@ Stage 5 of the career-agent workflow, only after the tailored resume and the int
 
 The main agent passes the resume slug and JD slug as part of the orchestration context. Read all three at `limit=1000`:
 
-- `tailored_resume/<resume-slug>/<jd-slug>.md` — for the candidate's strongest claims and headline metrics.
+- `/tailored_resume/<resume-slug>/<jd-slug>.md` — for the candidate's strongest claims and headline metrics.
 - `/interview_coach/<resume-slug>/<jd-slug>.md` — for the round taxonomy, STAR stories (use the 60-second versions), questions to ask back, and watch-outs.
 - `/research/<resume-slug>/<jd-slug>.md` — for the 3 punchiest company facts.
 
 ## Output format
 
-A single markdown file at `interview_battlecard/<resume-slug>/<jd-slug>.md` (no leading slash — FilesystemBackend). Inside, **one page per interview round**, separated by exactly `\n---\n`. The round list and order must match the interview-coach prep doc; do not invent or skip rounds.
+A single markdown file at `/interview_battlecard/<resume-slug>/<jd-slug>.md`. Inside, **one page per interview round**, separated by exactly `\n---\n`. The round list and order must match the interview-coach prep doc; do not invent or skip rounds.
 
 Each page is ~25–30 lines, four sections in this fixed order:
 
@@ -86,4 +86,4 @@ Each page is ~25–30 lines, four sections in this fixed order:
 
 ## Output handoff
 
-After writing the file, return one short line to the user: "Battlecard saved to `interview_battlecard/<resume>/<jd>.md` — N pages, one per round." Don't dump the markdown.
+After writing the file, return one short line to the user: "Battlecard saved to `/interview_battlecard/<resume>/<jd>.md` — N pages, one per round." Don't dump the markdown.

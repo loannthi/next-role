@@ -50,12 +50,12 @@ subagents=[
 **Flow:**
 
 1. Agent asks user for resume, JD, prep timeline, and any extra context.
-2.1. User uploads resume and optional JD → saves to `upload/`.
+2.1. User uploads resume and optional JD → saves to `/upload/`.
 2.2. Agent processes the uploaded documents → saves to `/processed/<slug>.md`. Persists intake answers to `/processed/<resume>-<jd>-intake.md`. Reads both processed files in full so it has substance for delegating downstream stages.
 3. Delegates to `hiring-recon` subagent → company + role intel + match analysis → saves to `/research/<resume>/<jd>.md`.
-4.1. Delegates to `resume-tailor` subagent → tailored resume → saves to `tailored_resume/<resume>/<jd>.md`.
+4.1. Delegates to `resume-tailor` subagent → tailored resume → saves to `/tailored_resume/<resume>/<jd>.md`.
 4.2. In parallel with 4.1, delegates to `interview-coach` subagent → structured prep doc with self-introduction + per-round STAR stories → saves to `/interview_coach/<resume>/<jd>.md`.
-5. Agent loads `skills/interview-battlecard/SKILL.md`, reads the tailored resume + interview-coach prep + research report, then writes a one-page-per-round battlecard → saves to `interview_battlecard/<resume>/<jd>.md`.
+5. Agent loads `/skills/interview-battlecard/SKILL.md`, reads the tailored resume + interview-coach prep + research report, then writes a one-page-per-round battlecard → saves to `/interview_battlecard/<resume>/<jd>.md`.
 
 
 ## File Upload (v1)
@@ -80,7 +80,7 @@ Re-uploading the same filename overwrites. Scoping is global per the layout abov
 ## File Structure
 
 ```
-upload/                                                       # FilesystemBackend
+/upload/                                                      # FilesystemBackend
 └── Senior AI Engineer - Tam NGUYEN.pdf                       # Uploaded resume
 └── AWS AI Solution Engineer.pdf                              # Uploaded JD
 
@@ -93,7 +93,7 @@ upload/                                                       # FilesystemBacken
 └── tam-nguyen-senior-ai-engineer-resume/
     └── aws-ai-solution-engineer-jd.md                        # hiring-recon report
 
-tailored_resume/                                              # FilesystemBackend
+/tailored_resume/                                             # FilesystemBackend
 └── tam-nguyen-senior-ai-engineer-resume/
     └── aws-ai-solution-engineer-jd.md                        # resume-tailor output
 
@@ -101,7 +101,7 @@ tailored_resume/                                              # FilesystemBacken
 └── tam-nguyen-senior-ai-engineer-resume/
     └── aws-ai-solution-engineer-jd.md                        # interview-coach output
 
-interview_battlecard/                                         # FilesystemBackend
+/interview_battlecard/                                        # FilesystemBackend
 └── tam-nguyen-senior-ai-engineer-resume/
     └── aws-ai-solution-engineer-jd.md                        # day-of cheat sheet
 ```

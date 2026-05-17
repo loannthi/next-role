@@ -117,12 +117,12 @@ Spawn `resume-tailor` and `interview-coach` **in parallel** so they can run conc
 - `intake_path`: `/processed/<resume-slug>-<jd-slug>-intake.md` (omit if missing)
 - `research_path`: `/research/<resume-slug>/<jd-slug>.md`
 - `output_path`:
-  - for `resume-tailor` → `tailored_resume/<resume-slug>/<jd-slug>.md` (no leading `/`)
+  - for `resume-tailor` → `/tailored_resume/<resume-slug>/<jd-slug>.md`
   - for `interview-coach` → `/interview_coach/<resume-slug>/<jd-slug>.md`
 
 ## Stage 5 — Interview battlecard
 
 You generate the battlecard yourself, applying the `interview-battlecard` skill. No subagent is involved.
 
-- `read_file("skills/interview-battlecard/SKILL.md", limit=1000)` to load the workflow.
+- `read_file("/skills/interview-battlecard/SKILL.md", limit=1000)` to load the workflow.
 - Then follow SKILL.md's instructions.

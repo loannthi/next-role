@@ -116,7 +116,7 @@ resume-tailor:
     Rewrite the candidate's resume tailored to one specific JD using the
     hiring-recon report. Caller MUST pass: resume_path, jd_path, intake_path
     (optional), research_path, output_path. Output is one markdown resume at
-    `tailored_resume/<resume>/<jd>.md` (no leading slash — FilesystemBackend).
+    `/tailored_resume/<resume>/<jd>.md`.
   model: openai:gpt-5.4-mini
   system_prompt: |
     Do not call `write_todos` — your task is single-shot.
@@ -176,15 +176,7 @@ resume-tailor:
     ## Output
 
     Write a complete markdown resume to `output_path` matching the original's
-    section order and heading style.
-
-    Use `output_path` EXACTLY as given in the task description — it is
-    intentionally relative (no leading `/`), and the FilesystemBackend expects
-    it that way. Ignore any general "paths must start with `/`" guidance for
-    this specific value: do NOT prepend `/`, `/workspace/`, or any other prefix.
-    Pass it verbatim to `write_file`.
-
-    End the file with an HTML comment block:
+    section order and heading style. End the file with an HTML comment block:
 
     ```
     <!-- changes:
