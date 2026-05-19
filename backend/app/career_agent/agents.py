@@ -17,7 +17,7 @@ from backend.app.career_agent.tools import (
 )
 from backend.app.career_agent.utils import load_subagents
 from deepagents import create_deep_agent
-from deepagents.backends import CompositeBackend, FilesystemBackend, StoreBackend
+from deepagents.backends import CompositeBackend, LocalShellBackend, StoreBackend
 
 
 def _apply_prompt_overrides() -> None:
@@ -67,7 +67,11 @@ _MODEL = "bedrock_converse:global.anthropic.claude-sonnet-4-6"
 
 
 _backend = CompositeBackend(
-    default=FilesystemBackend(root_dir=CAREER_AGENT_DIR, virtual_mode=True),
+    default=LocalShellBackend(
+        root_dir=CAREER_AGENT_DIR,
+        virtual_mode=True,
+        timeout=60,
+    ),
     routes={
         "/memory/": StoreBackend(
             namespace=lambda _: ("career_agent", "memory"),
