@@ -78,7 +78,7 @@ _backend = CompositeBackend(
         "/memory/": StoreBackend(
             namespace=lambda _: ("career_agent", "memory"),
         ),
-        "/processed": StoreBackend(
+        "/processed/": StoreBackend(
             namespace=lambda _: ("career_agent", "processed"),
         ),
         "/research/": StoreBackend(
