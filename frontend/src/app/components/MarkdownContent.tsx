@@ -59,7 +59,7 @@ export const MarkdownContent = React.memo<MarkdownContentProps>(({ content, clas
   return (
     <div
       className={cn(
-        "prose min-w-0 max-w-full overflow-hidden break-words text-sm leading-relaxed text-inherit [&_h1:first-child]:mt-0 [&_h1]:mb-4 [&_h1]:mt-6 [&_h1]:font-semibold [&_h2:first-child]:mt-0 [&_h2]:mb-4 [&_h2]:mt-6 [&_h2]:font-semibold [&_h3:first-child]:mt-0 [&_h3]:mb-4 [&_h3]:mt-6 [&_h3]:font-semibold [&_h4:first-child]:mt-0 [&_h4]:mb-4 [&_h4]:mt-6 [&_h4]:font-semibold [&_h5:first-child]:mt-0 [&_h5]:mb-4 [&_h5]:mt-6 [&_h5]:font-semibold [&_h6:first-child]:mt-0 [&_h6]:mb-4 [&_h6]:mt-6 [&_h6]:font-semibold [&_p:last-child]:mb-0 [&_p]:mb-4",
+        "prose prose-sm min-w-0 max-w-full overflow-hidden break-words leading-relaxed text-inherit [&>p:last-child]:mb-0 [&>p]:mb-4 [&_h1:first-child]:mt-0 [&_h1]:mb-4 [&_h1]:mt-6 [&_h1]:font-semibold [&_h2:first-child]:mt-0 [&_h2]:mb-4 [&_h2]:mt-6 [&_h2]:font-semibold [&_h3:first-child]:mt-0 [&_h3]:mb-4 [&_h3]:mt-6 [&_h3]:font-semibold [&_h4:first-child]:mt-0 [&_h4]:mb-4 [&_h4]:mt-6 [&_h4]:font-semibold [&_h5:first-child]:mt-0 [&_h5]:mb-4 [&_h5]:mt-6 [&_h5]:font-semibold [&_h6:first-child]:mt-0 [&_h6]:mb-4 [&_h6]:mt-6 [&_h6]:font-semibold [&_li_p:last-child]:mb-0",
         className
       )}
     >
@@ -67,20 +67,20 @@ export const MarkdownContent = React.memo<MarkdownContentProps>(({ content, clas
         remarkPlugins={[remarkGfm]}
         components={{
           code({
-            inline,
             className,
             children,
             ...props
           }: {
-            inline?: boolean;
             className?: string;
             children?: React.ReactNode;
           }) {
+            const codeStr = String(children ?? "");
             const match = /language-(\w+)/.exec(className || "");
-            return !inline && match ? (
+            const isBlock = !!match || codeStr.includes("\n");
+            return isBlock ? (
               <SyntaxHighlighter
                 style={adaptiveCodeTheme}
-                language={match[1]}
+                language={match?.[1] ?? "text"}
                 PreTag="div"
                 className="max-w-full rounded-xl border border-border text-sm"
                 wrapLines={true}
@@ -101,7 +101,7 @@ export const MarkdownContent = React.memo<MarkdownContentProps>(({ content, clas
                   padding: "1rem",
                 }}
               >
-                {String(children).replace(/\n$/, "")}
+                {codeStr.replace(/\n$/, "")}
               </SyntaxHighlighter>
             ) : (
               <code
@@ -135,10 +135,18 @@ export const MarkdownContent = React.memo<MarkdownContentProps>(({ content, clas
             );
           },
           ul({ children }: { children?: React.ReactNode }) {
-            return <ul className="my-4 pl-6 [&>li:last-child]:mb-0 [&>li]:mb-1">{children}</ul>;
+            return (
+              <ul className="my-4 list-disc pl-6 [&>li:last-child]:mb-0 [&>li]:mb-1 [&_.task-list-item]:ml-0 [&_.task-list-item]:list-none [&_ul]:list-[circle] [&_ul_ul]:list-[square]">
+                {children}
+              </ul>
+            );
           },
           ol({ children }: { children?: React.ReactNode }) {
-            return <ol className="my-4 pl-6 [&>li:last-child]:mb-0 [&>li]:mb-1">{children}</ol>;
+            return (
+              <ol className="my-4 list-decimal pl-6 [&>li:last-child]:mb-0 [&>li]:mb-1">
+                {children}
+              </ol>
+            );
           },
           table({ children }: { children?: React.ReactNode }) {
             return (
@@ -148,6 +156,18 @@ export const MarkdownContent = React.memo<MarkdownContentProps>(({ content, clas
                 </table>
               </div>
             );
+          },
+          img({ src, alt }: { src?: string | Blob; alt?: string }) {
+            return (
+              <img
+                src={typeof src === "string" ? src : undefined}
+                alt={alt ?? ""}
+                className="my-4 h-auto max-w-full rounded-md border border-border"
+              />
+            );
+          },
+          hr() {
+            return <hr className="my-6 border-border" />;
           },
         }}
       >
