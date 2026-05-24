@@ -15,6 +15,7 @@ from backend.app.career_agent.tools import (
     make_overwrite_file,
     make_parse_document,
     make_prepare_render_settings,
+    make_render_battlecard_pdf,
     web_extract,
     web_search,
 )
@@ -104,6 +105,7 @@ _parse_document = make_parse_document(_backend)
 _extract_jd = make_extract_jd(_backend)
 _overwrite_file = make_overwrite_file(_backend)
 _prepare_render_settings = make_prepare_render_settings(_backend)
+_render_battlecard_pdf = make_render_battlecard_pdf(_backend)
 
 # Generic filesystem utilities every subagent gets unconditionally — saves
 # re-declaring them in subagents.yaml per entry.
@@ -126,9 +128,10 @@ career_agent = create_deep_agent(
     skills=["skills/career-agent/"],
     tools=[
         _list_files,
+        _overwrite_file,
         _parse_document,
         _extract_jd,
-        _overwrite_file,
+        _render_battlecard_pdf,
     ],
     subagents=load_subagents(
         CAREER_AGENT_DIR / "subagents.yaml",

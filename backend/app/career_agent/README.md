@@ -68,7 +68,7 @@ subagents=[
 3. Delegates to `hiring-recon` subagent → company + role intel + match analysis → saves to `/research/<resume>/<jd>.md`.
 4.1. Delegates to `resume-tailor` subagent → tailored resume YAML at `/tailored_resume/<resume>/<jd>.yaml` (source of truth, user-editable), which `rendercv` then renders to `.typ` + `.pdf` siblings.
 4.2. In parallel with 4.1, delegates to `interview-coach` subagent → structured prep doc with self-introduction + per-round STAR stories → saves to `/interview_coach/<resume>/<jd>.md`.
-5. Agent loads `/skills/interview-battlecard/SKILL.md`, reads the tailored resume + interview-coach prep + research report, then writes a one-page-per-round battlecard → saves to `/interview_battlecard/<resume>/<jd>.md`.
+5. Agent loads `/skills/interview-battlecard/SKILL.md`, reads the tailored resume + interview-coach prep + research report, writes a one-page-per-round battlecard as JSON at `/interview_battlecard/<resume>/<jd>.json` (LLM-written, user-editable source of truth), then calls `render_battlecard_pdf` to produce a `.pdf` sibling for download.
 
 
 ## File Upload (v1)
@@ -121,7 +121,8 @@ Re-uploading the same filename overwrites. Scoping is global per the layout abov
 
 /interview_battlecard/                                        # FilesystemBackend
 └── tam-nguyen-senior-ai-engineer-resume/
-    └── aws-ai-solution-engineer-jd.md                        # day-of cheat sheet
+    ├── aws-ai-solution-engineer-jd.json                      # weasyprint source (LLM-written, user-editable)
+    └── aws-ai-solution-engineer-jd.pdf                       # weasyprint-rendered day-of cheat sheet
 ```
 
-Note: tailored resumes already render to PDF via `rendercv` (the YAML is the source of truth; the `.typ` / `.pdf` siblings are regenerated on demand by `prepare_render_settings` + `rendercv render`). The interview battlecard still emits `.md` today; PDF rendering for the battlecard is a future phase, which is why `/interview_battlecard/` uses FilesystemBackend (so the eventual binary output lands on disk, not in Postgres).
+Note: both the tailored resume and the interview battlecard follow the same source-then-render pattern. Tailored resumes use `rendercv` (YAML → `.typ` intermediate → `.pdf`, via `prepare_render_settings` + `rendercv render`). Battlecards use `weasyprint` (JSON → `.pdf`, via `render_battlecard_pdf`). The JSON / YAML side is the user-editable source of truth; the PDF is regenerated on demand. `/interview_battlecard/` uses FilesystemBackend so the binary PDF lands on disk, not in Postgres.

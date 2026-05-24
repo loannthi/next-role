@@ -1,5 +1,6 @@
 """Tools for the career agent."""
 
+import json
 import re
 import textwrap
 from pathlib import Path
@@ -398,6 +399,68 @@ def make_prepare_render_settings(backend: CompositeBackend) -> BaseTool:
         )
 
     return prepare_render_settings
+
+
+def make_render_battlecard_pdf(backend: CompositeBackend) -> BaseTool:
+    """Build the `render_battlecard_pdf` tool, closed over the agent's backend."""
+
+    @tool
+    def render_battlecard_pdf(json_path: str) -> str:
+        """Render an interview-battlecard JSON to PDF via weasyprint.
+
+        Run this AFTER the agent has written the JSON source of truth.
+        Reads the JSON via the backend, renders the bundled Jinja2 template,
+        and writes `<stem>.pdf` next to the JSON on real disk. Idempotent —
+        any prior PDF at the same path is overwritten.
+
+        Args:
+            json_path: Absolute backend path under `/interview_battlecard/`
+                ending in `.json`, e.g.
+                "/interview_battlecard/<resume-slug>/<jd-slug>.json".
+
+        Returns:
+            Short confirmation string with the on-disk PDF path,
+            or `Error: ...` on failure.
+
+        """
+        if not json_path.startswith("/interview_battlecard/") or not json_path.endswith(".json"):
+            return (
+                f"Error: invalid json_path {json_path!r} "
+                "(must start with /interview_battlecard/ and end with .json)"
+            )
+
+        read_res = backend.read(json_path, offset=0, limit=10**9)
+        if read_res.error or not read_res.file_data:
+            return f"Error reading {json_path}: {read_res.error or 'not found'}"
+        content = read_res.file_data.get("content", "")
+        if isinstance(content, list):
+            content = "\n".join(content)
+        try:
+            data = json.loads(content)
+        except json.JSONDecodeError as e:
+            return f"Error: {json_path} is not valid JSON: {e}"
+
+        # Lazy imports — weasyprint pulls Pango/GLib via cffi at import time,
+        # so deferring keeps `tools.py` import-safe on hosts without those libs.
+        from jinja2 import Environment, FileSystemLoader
+        from weasyprint import HTML
+
+        template_dir = CAREER_AGENT_DIR / "templates" / "battlecard"
+        env = Environment(loader=FileSystemLoader(str(template_dir)), autoescape=True)
+        template = env.get_template("battlecard.html.j2")
+        html_str = template.render(**data)
+
+        pdf_path = (CAREER_AGENT_DIR / json_path.lstrip("/")).with_suffix(".pdf")
+        pdf_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            HTML(string=html_str, base_url=str(template_dir)).write_pdf(str(pdf_path))
+        except Exception as e:
+            return f"Error rendering PDF for {json_path}: {e}"
+
+        pdf_backend_path = json_path.removesuffix(".json") + ".pdf"
+        return f"Rendered PDF to {pdf_backend_path}"
+
+    return render_battlecard_pdf
 
 
 def make_extract_jd(backend: CompositeBackend) -> BaseTool:
