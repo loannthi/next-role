@@ -21,10 +21,17 @@ The main agent passes the resume slug and JD slug as part of the orchestration c
 
 A single markdown file at `/interview_battlecard/<resume-slug>/<jd-slug>.md`. Inside, **one page per interview round**, separated by exactly `\n---\n`. The round list and order must match the interview-coach prep doc; do not invent or skip rounds.
 
-Each page is ~25–30 lines, four sections in this fixed order:
+Each page is ~30–35 lines, five sections in this fixed order:
 
 ```
 # <Round name> — <format>
+
+## Introduction
+- <keyword / highlight 1>
+- <keyword / highlight 2>
+- <keyword / highlight 3>
+- ...
+(4–6 short bullets — keywords and phrases only, NOT full sentences. The candidate uses these as memory anchors for the 60s / 30s self-intro they rehearsed in the prep doc.)
 
 ## Stories ready
 - **<Story title>** — <one-liner, ~15 sec, lifted from the prep doc>
@@ -48,16 +55,29 @@ Each page is ~25–30 lines, four sections in this fixed order:
 ## Hard rules
 
 - **No preamble, no filler, no commentary.** No "here's your battlecard for…". The first byte of the file is `#`.
-- **No headers beyond the four above.** No subheadings, no bullets explaining bullets.
+- **No headers beyond the five above.** No subheadings, no bullets explaining bullets.
+- **Introduction** is keywords / short phrases only — never full sentences, never the rehearsed pitch pasted in verbatim. The interview-coach prep doc contains two rehearsed versions (an elevator pitch and a short version); this section distills both into memory anchors the candidate can scan in 5 seconds to recall either version. Tailor the bullets to the round:
+  - **Recruiter / screen**: identity + headline strengths + why-this-company hook.
+  - **Technical rounds**: identity + concrete tech stack / systems built (e.g., "RAG, multi-agent orchestration, pgvector") + 1 flagship outcome.
+  - **Hiring manager / behavioral**: identity + leadership / ownership signals + motivation hook.
+  - **Culture / values / panel**: identity + behaviors and working style (e.g., "bias to ship", "customer-facing", "low-ego") + team-fit hook.
+  Different rounds may overlap heavily — that's expected. Lean the emphasis toward what the round will actually probe.
 - **Stories ready** uses the 15-second one-liner version distilled from the interview-coach prep's STAR. Don't paste full STAR.
 - **Company facts** must be falsifiable (numbers, names, dates). "Innovative culture" is not a fact; "Series C, $80M raised Q3 2025 led by Sequoia" is.
 - **Questions to ask** must reference something specific from the research file (named team member, recent product launch, a Glassdoor pattern). Generic questions like "what does success look like?" do not earn a slot.
-- **Tight mode**: if the intake's prep timeline is `< 3 days`, drop the **Watch-outs** section from every page (in that order — Stories ready and Questions to ask are non-negotiable).
 
 ## Example skeleton (a 2-round battlecard)
 
 ```
 # Recruiter screen — 30-min phone
+
+## Introduction
+- Senior AI / full-stack eng, 8 yrs
+- Production AI: agentic apps, RAG, knowledge graphs
+- Led multi-agent RAG w/ long-term memory + evals
+- Prior: data/ML platforms, lakehouse, pipelines
+- Hook: forward-deployed, customer-facing, reusable AI patterns
+- Why Inferra: cognitive ontology + agentic focus
 
 ## Stories ready
 - **Migrated payments to Stripe in 6 weeks** — solo, 0 incidents, $2M throughput
@@ -79,6 +99,13 @@ Each page is ~25–30 lines, four sections in this fixed order:
 ---
 
 # Hiring-manager behavioral — 60 min with Maya
+
+## Introduction
+- Senior AI eng, builder + owner
+- Ship end-to-end; comfortable owning ambiguity
+- Led 0→1 systems and small teams (3 hires at Acme)
+- Bias to ship, low-ego, write things down
+- Why now: want customer-facing impact, not pure infra
 
 ## Stories ready
 - ...
