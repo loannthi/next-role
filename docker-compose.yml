@@ -81,6 +81,12 @@ services:
       - "${LANGGRAPH_LOCAL_PORT}:8000"
     volumes:
       - .:/deps/next-role
+      # Keep the container's uv-managed `.venv` isolated from the host. Without
+      # this, `uv run` inside the container creates `/deps/next-role/backend/.venv`
+      # which leaks through the bind mount to the host with container-style paths
+      # hardcoded — making the venv unusable from macOS and clobbering any host
+      # venv. Same pattern as frontend `node_modules` above.
+      - /deps/next-role/backend/.venv
     depends_on:
       redis:
         condition: service_healthy
