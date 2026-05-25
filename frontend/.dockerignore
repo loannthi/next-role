@@ -5,3 +5,13 @@ coverage
 .DS_Store
 .env*
 !.env.example
+
+# Build/tool caches
+.turbo
+tsconfig.tsbuildinfo
+.eslintcache
+
+# OS / IDE
+.DS_Store
+.vscode
+.idea
