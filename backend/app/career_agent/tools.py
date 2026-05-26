@@ -390,10 +390,7 @@ def make_prepare_render_settings(backend: CompositeBackend) -> BaseTool:
         if write_result.error:
             return f"Error writing {yaml_path}: {write_result.error}"
 
-        # The shell can't see backend paths — surface the on-disk absolute path
-        # so the LLM can copy it verbatim into `execute("rendercv render …")`.
-        on_disk_yaml = on_disk_dir / Path(yaml_path).name
-        return f"Prepared for rendering.\nOn-disk absolute path: {on_disk_yaml}"
+        return f"Prepared for rendering: {yaml_path}\nReady to render now."
 
     return prepare_render_settings
 

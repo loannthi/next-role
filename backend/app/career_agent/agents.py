@@ -8,6 +8,7 @@ import deepagents.middleware.subagents as _sub_mw
 import langchain.agents.middleware.todo as _todo_mw
 from backend.app.career_agent import prompts as _prompts
 from backend.app.career_agent.middleware import UtcDatetimeMiddleware
+from backend.app.career_agent.shell_backend import VirtualPathShellBackend
 from backend.app.career_agent.tools import (
     CAREER_AGENT_DIR,
     make_extract_jd,
@@ -21,7 +22,7 @@ from backend.app.career_agent.tools import (
 )
 from backend.app.career_agent.utils import load_subagents
 from deepagents import create_deep_agent
-from deepagents.backends import CompositeBackend, LocalShellBackend, StoreBackend
+from deepagents.backends import CompositeBackend, StoreBackend
 
 
 def _apply_prompt_overrides() -> None:
@@ -70,7 +71,7 @@ _apply_prompt_overrides()
 _MODEL = "openai:gpt-5.4"
 
 _backend = CompositeBackend(
-    default=LocalShellBackend(
+    default=VirtualPathShellBackend(
         root_dir=CAREER_AGENT_DIR,
         virtual_mode=True,
         timeout=60,
