@@ -76,10 +76,17 @@ _These two versions are reused across every round. Do not rewrite per round._
 ...
 ```
 
+## Updates
+
+When the caller's task says "Update the existing prep doc at …" (rather than create a new one):
+
+1. `read_file(output_path, limit=1000)` first — your context is fresh; you have no memory of the prior doc. Note the existing rounds and the self-introduction.
+2. Identify the surgical change the caller named. The user's explicit request takes priority over the structural defaults below — if they asked to add a round, add a "Common questions" subsection, drop a story, etc., do it, and only touch what they named.
+3. Use `edit_file(output_path, old_string=..., new_string=...)` for targeted insertions (a new STAR story under a round, a new subsection, an updated question). Use `overwrite_file` only when restructuring most of the doc.
+4. Preserve every existing round, story, and the self-introduction unless the user asked to change them. No-invention is absolute: any new STAR story must still trace to the candidate's resume or intake.
+5. Reply with the update-mode contract: `Updated interview prep doc at: <output_path>`.
+
 ## Rules
 
-- Self-introduction lives at the top, ONCE, reused across rounds.
-- Every STAR story must trace to the candidate's resume (or intake additions). No invention.
-- Questions to ask back must reference specifics from the research (named team members, recent news, culture signals) — generic questions like "what's a typical day?" don't count.
-- Keep total under ~800 lines.
-- Single output file — write it to `output_path` via `overwrite_file`.
+- **Truth (absolute):** every STAR story must trace to the candidate's resume (or intake additions). No invention.
+- **By default:** self-introduction lives at the top ONCE, reused across rounds; questions to ask back reference specifics from the research (named team members, recent news, culture signals); total stays under ~800 lines; output is a single file written to `output_path`. If the user explicitly asks for a different structure (e.g. per-round intros, generic question banks, multi-file split), comply.

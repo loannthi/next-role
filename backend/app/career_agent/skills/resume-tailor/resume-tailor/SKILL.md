@@ -62,14 +62,16 @@ For the lead bullet of each role, prefer the transformation framing: `Inherited 
 
 Acceptable: reordering true information, emphasizing relevant experience, using industry-standard terminology, adding context to vague statements, matching language style to the JD.
 
-Unacceptable (do NOT do these):
+Unacceptable — **absolute** (truth / fabrication; user can override only if they confirm they really want):
 - Adding skills the candidate doesn't have
-- **Dropping skills the candidate DOES have.** Every skill category and every bullet/detail from the source resume must appear in the YAML. Reorder and reword for JD fit; never prune.
-- **Dropping URLs from the source.** The processed resume (parsed from a PDF) often carries URLs that don't show in the visible text — clickable company names, project links, social profiles, article citations, certification credentials. Every URL the candidate has on the original CV must survive into the YAML, in the appropriate field (`cv.website`, `social_networks`, `custom_connections`, publication `url`, OneLineEntry `details` as `[label](url)`, or inline `[text](url)` Markdown inside a highlight).
 - Changing numbers, metrics, or scope
 - Inventing experiences or projects
 - Claiming titles not held
 - Inventing certifications
+
+Unacceptable **by default** (preservation; the user CAN explicitly override on a per-item basis):
+- Dropping skills the candidate DOES have. Every skill category and every bullet/detail from the source resume should appear in the YAML. Reorder and reword for JD fit; never prune *unless the user asked you to drop a specific item* — then drop only what they named.
+- Dropping URLs from the source. The processed resume (parsed from a PDF) often carries URLs that don't show in the visible text — clickable company names, project links, social profiles, article citations, certification credentials. Every such URL should survive into the YAML, in the appropriate field (`cv.website`, `social_networks`, `custom_connections`, publication `url`, OneLineEntry `details` as `[label](url)`, or inline `[text](url)` Markdown inside a highlight). *Exception:* if the user asked to drop a specific URL, drop only that one.
 
 If the intake file mentions skills/projects not on the CV, you MAY incorporate them — but only those, and only as additions to existing roles.
 
@@ -115,7 +117,7 @@ Rules:
 
 ## Entry-type mapping
 
-**Skills preservation rule:** carry every skill category and every bullet from the source resume into the YAML. Reorder so JD-relevant skills lead each category, and rewrite to incorporate JD keywords where natural — but do NOT prune. Missing skills are the single most common defect; double-check the YAML against the processed resume before step 3.
+**Skills preservation rule (default):** carry every skill category and every bullet from the source resume into the YAML. Reorder so JD-relevant skills lead each category, and rewrite to incorporate JD keywords where natural — but do NOT prune. Missing skills are the single most common defect; double-check the YAML against the processed resume before step 3. *Exception:* if the user explicitly asks to drop a specific skill or category, drop only what they named.
 
 | Source section | rendercv entry type | Required fields | Notes |
 |---|---|---|---|
@@ -188,7 +190,7 @@ cv:
 - article / blog post URLs → `PublicationEntry.url`
 - company / project / repo links inside a bullet → inline `[text](url)` Markdown inside the `highlights` string
 
-Never drop a URL just because the visible text reads cleanly without it. Treat URL omission with the same severity as dropping a skill.
+Never drop a URL just because the visible text reads cleanly without it. Treat URL omission with the same severity as dropping a skill. *Exception:* if the user explicitly asks to drop a specific URL or social/custom connection, drop only what they named.
 
 The processed resume usually contains formatting that rendercv cannot render. Strip / convert ALL of the following before writing the YAML:
 
@@ -225,7 +227,20 @@ The processed resume usually contains formatting that rendercv cannot render. St
 - One YAML file written by you at `yaml_path` (`cv` + `design` + `locale` + the `# changes:` header).
 - `prepare_render_settings` appends the `settings:` block in-place.
 - `rendercv render` writes `<stem>.typ` and `<stem>.pdf` next to the YAML.
-- Final reply is exactly one line: `Wrote tailored resume PDF to: <pdf_path>`.
+- Final reply is exactly one line, with the verb matching the mode:
+  - Create: `Wrote tailored resume PDF to: <pdf_path>`
+  - Update: `Updated tailored resume PDF at: <pdf_path>`
+
+## Updates
+
+When the caller's task says "Update the existing tailored resume at …" (rather than create a new one):
+
+1. `read_file(yaml_path, limit=1000)` first — your context is fresh; you have no memory of the prior YAML. Note the existing `# changes:` block.
+2. Identify the surgical change the caller named. The user's explicit request takes priority over the preservation defaults (skills, URLs, single-file output, length) — if they asked to drop a skill / link / section, do it, and only touch what they named. Truth/fabrication rules (don't invent skills, change metrics, claim untrue titles) still apply with user confirmation.
+3. Use `edit_file(yaml_path, old_string=..., new_string=...)` for targeted edits (a single bullet, one skill, a phone update, the `# changes:` header). Use `overwrite_file` only when restructuring most of the YAML.
+4. Append one line to the `# changes:` block describing what you just did (so the next update has a history).
+5. Re-run `prepare_render_settings(yaml_path)` then `execute("rendercv render <on-disk YAML path>")` to refresh the `.pdf`. The intermediate `.typ` will refresh too. Skipping this leaves the PDF stale.
+6. Reply with the update-mode contract: `Updated tailored resume PDF at: <pdf_path>`.
 
 ## Rules
 

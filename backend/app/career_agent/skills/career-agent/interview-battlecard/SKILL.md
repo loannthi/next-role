@@ -31,7 +31,7 @@ Two-step flow, in this exact order:
 1. `overwrite_file("/interview_battlecard/<resume>/<jd>.json", <json string>)` — write the JSON source.
 2. `render_battlecard_pdf("/interview_battlecard/<resume>/<jd>.json")` — render the PDF beside it.
 
-If the user later edits the JSON in Workspace > Files and asks for a re-render, call `render_battlecard_pdf` again on the same path. The tool is idempotent.
+See the "## Updates" section below for follow-up edits (adding a round, swapping a story, re-rendering after a user hand-edit).
 
 ## JSON shape (strict)
 
@@ -75,12 +75,17 @@ Different rounds may overlap heavily — that's expected. Lean the emphasis towa
 
 ## Hard rules
 
-- **No preamble, no filler, no commentary.** The JSON value is the deliverable. Do not write any markdown summary alongside it.
-- **`introduction` items are keywords / short phrases.** Never full sentences, never the rehearsed pitch pasted verbatim.
-- **`stories_ready[].body` is the 15-second one-liner**, not the full STAR.
+**Absolute (truth / fabrication; user cannot override):**
+
 - **`company_facts` must be falsifiable** (numbers, names, dates). "Innovative culture" is not a fact; "Series C, $80M raised Q3 2025 led by Sequoia" is.
 - **`questions` must reference something specific from the research file** (named team member, recent product launch, a Glassdoor pattern). Generic questions like "what does success look like?" do not earn a slot.
-- **No extra keys** beyond those listed. The PDF template ignores unknown keys silently — if you invent one, it just disappears.
+
+**By default (user CAN explicitly override):**
+
+- **No preamble, no filler, no commentary.** The JSON value is the deliverable. Do not write any markdown summary alongside it.
+- **`introduction` items are keywords / short phrases.** Never full sentences, never the rehearsed pitch pasted verbatim. If the user asks for full-sentence intros for one round, comply just for that round.
+- **`stories_ready[].body` is the 15-second one-liner**, not the full STAR. If the user explicitly wants a longer body for a specific story, comply.
+- **No extra keys** beyond those listed. The PDF template ignores unknown keys silently — if you invent one, it just disappears. If the user asks for an extra section (e.g. "Pro tips"), surface that the renderer ignores unknown keys and propose either adapting an existing field or extending the template; don't silently invent.
 
 ## Example (2-round battlecard)
 
@@ -150,6 +155,19 @@ Different rounds may overlap heavily — that's expected. Lean the emphasis towa
   ]
 }
 ```
+
+## Updates
+
+The battlecard is the main agent's own artifact — no subagent is involved. When the user asks for an in-place change ("add a 4th round", "swap the second story in round 2", "rewrite the watch-outs for round 1", "re-render — I edited the JSON in Workspace"):
+
+1. `read_file("/interview_battlecard/<resume>/<jd>.json", limit=1000)` first, even if you think you remember the JSON. Chat history may have been compacted; the user may have edited the JSON via Workspace > Files between turns.
+2. Identify the surgical change the user named. The user's explicit request takes priority over the default rules above — if they asked for full-sentence intros, a longer story body, or an extra key, comply for the items they named.
+3. Apply the change:
+   - **`edit_file(path, old_string=..., new_string=...)`** for inserting/replacing a single round, story, fact, question, or watch-out. The new content must still satisfy the schema (round order matches the prep doc, JSON object shape, types).
+   - **`overwrite_file(path, <new json>)`** only when restructuring most of the file (e.g. the user reordered every round, or you're rewriting from a refreshed interview-coach doc).
+   - **No JSON change** if the user only asked to re-render after editing in Workspace; skip straight to step 4.
+4. `render_battlecard_pdf("/interview_battlecard/<resume>/<jd>.json")` — mandatory after any JSON change, and on a re-render-only request. The tool is idempotent.
+5. Report back with one line per the AGENTS.md update phrasing convention (`Updated battlecard at: <pdf_path>` or similar). Don't dump the JSON.
 
 ## Output handoff
 

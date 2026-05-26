@@ -71,6 +71,11 @@ subagents=[
 5. Agent loads `/skills/interview-battlecard/SKILL.md`, reads the tailored resume + interview-coach prep + research report, writes a one-page-per-round battlecard as JSON at `/interview_battlecard/<resume>/<jd>.json` (LLM-written, user-editable source of truth), then calls `render_battlecard_pdf` to produce a `.pdf` sibling for download.
 
 
+## Multi-turn updates
+
+Once the five stages have run, users iterate ("add a round", "drop this link", "add common questions to round 2"). The main agent routes by which file owns the change: it edits `/interview_battlecard/<r>/<j>.json` itself (read → `edit_file` or `overwrite_file` → `render_battlecard_pdf`), and delegates research / tailored-resume / interview-prep updates to the matching subagent with an explicit "update" task description that names the target path and the surgical change. Subagents read the existing file first, preserve everything the user did not name, and reply with `Updated … at: <path>`. Skill-level preservation defaults (don't drop a skill, don't drop a URL, etc.) yield to explicit user requests; truth/fabrication rules stay absolute. See `AGENTS.md` "Stage 6 — Updates" for the full procedure and task-input templates.
+
+
 ## File Upload (v1)
 
 Users upload raw resume / JD files (PDF, DOC, DOCX, TXT, MD; up to 10 MB each) from
