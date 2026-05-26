@@ -13,6 +13,9 @@ interface FilesSectionProps {
   files: Record<string, string>;
   setFiles: (files: Record<string, string>) => Promise<void>;
   removeFile: (virtualPath: string) => Promise<void>;
+  removeFiles: (
+    virtualPaths: string[]
+  ) => Promise<{ deleted: string[]; errors: { path: string; reason: string }[] }>;
   editDisabled: boolean;
   open: boolean;
   onToggle: () => void;
@@ -24,6 +27,7 @@ export function FilesSection({
   files,
   setFiles,
   removeFile,
+  removeFiles,
   editDisabled,
   open,
   onToggle,
@@ -101,6 +105,7 @@ export function FilesSection({
           files={files}
           setFiles={setFiles}
           removeFile={removeFile}
+          removeFiles={removeFiles}
           editDisabled={editDisabled}
         />
       )}

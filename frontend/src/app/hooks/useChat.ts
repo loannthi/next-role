@@ -364,6 +364,38 @@ export function useChat({
     [refreshFiles]
   );
 
+  const removeFiles = useCallback(
+    async (
+      virtualPaths: string[]
+    ): Promise<{ deleted: string[]; errors: { path: string; reason: string }[] }> => {
+      const results = await Promise.allSettled(
+        virtualPaths.map(async (vp) => {
+          const file = extendedFilesRef.current.find((f) => f.path === vp);
+          if (!file) throw new Error(`File not found: ${vp}`);
+          if (file.source !== "disk") {
+            throw new Error("Only disk-backed files can be deleted from the UI");
+          }
+          await deleteAgentFile(file.sourceKey);
+          return vp;
+        })
+      );
+      const deleted: string[] = [];
+      const errors: { path: string; reason: string }[] = [];
+      results.forEach((r, i) => {
+        if (r.status === "fulfilled") {
+          deleted.push(r.value);
+        } else {
+          const reason =
+            r.reason instanceof Error ? r.reason.message : String(r.reason ?? "Delete failed");
+          errors.push({ path: virtualPaths[i], reason });
+        }
+      });
+      await refreshFiles();
+      return { deleted, errors };
+    },
+    [refreshFiles]
+  );
+
   // Composer input state, lifted out of ChatInterface so any surface (paperclip,
   // Workspace > Files Upload, future drag-drop) can append a note in one place.
   const [input, setInput] = useState("");
@@ -426,6 +458,7 @@ export function useChat({
     setFiles,
     refreshFiles,
     removeFile,
+    removeFiles,
     input,
     setInput,
     appendUploadNote,

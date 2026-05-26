@@ -1,7 +1,16 @@
 "use client";
 
 import React, { useMemo, useCallback, useState, useEffect, useRef } from "react";
-import { FileText, CheckCircle, Circle, Clock, ChevronDown, Trash2, Loader2 } from "lucide-react";
+import {
+  FileText,
+  CheckCircle,
+  Circle,
+  Clock,
+  ChevronDown,
+  Trash2,
+  Loader2,
+  Check,
+} from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,14 +31,18 @@ function FileCard({
   filePath,
   fileContent,
   editDisabled,
+  selected,
   onOpen,
   onRequestDelete,
+  onToggleSelect,
 }: {
   filePath: string;
   fileContent: string;
   editDisabled: boolean;
+  selected: boolean;
   onOpen: (file: FileItem) => void;
   onRequestDelete: (path: string) => void;
+  onToggleSelect: (path: string, event: React.MouseEvent) => void;
 }) {
   const category = getFileCategory(filePath);
   const { prefix, basename } = splitFilePath(filePath);
@@ -50,7 +63,13 @@ function FileCard({
   }, [prefix, stem]);
 
   return (
-    <div className="group relative" style={{ backgroundColor: "var(--color-file-button)" }}>
+    <div
+      className={cn(
+        "group relative rounded-xl transition-shadow",
+        selected && "ring-2 ring-primary/40"
+      )}
+      style={{ backgroundColor: "var(--color-file-button)" }}
+    >
       <button
         type="button"
         onClick={() => onOpen({ path: filePath, content: fileContent })}
@@ -76,6 +95,26 @@ function FileCard({
       </button>
       <button
         type="button"
+        role="checkbox"
+        aria-checked={selected}
+        aria-label={selected ? `Deselect ${filePath}` : `Select ${filePath}`}
+        title={selected ? "Deselect" : "Select"}
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleSelect(filePath, e);
+        }}
+        className={cn(
+          "absolute left-1.5 top-1.5 inline-flex size-5 items-center justify-center rounded border transition-opacity",
+          "focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+          selected
+            ? "text-primary-foreground border-primary bg-primary opacity-100"
+            : "hover:border-primary/60 border-border bg-background text-transparent opacity-0 group-hover:opacity-100"
+        )}
+      >
+        <Check size={12} strokeWidth={3} />
+      </button>
+      <button
+        type="button"
         aria-label={`Delete ${filePath}`}
         title="Delete"
         onClick={(e) => {
@@ -91,20 +130,45 @@ function FileCard({
   );
 }
 
+const DELETE_PREVIEW_LIMIT = 5;
+
 export function FilesPopover({
   files,
   setFiles,
   removeFile,
+  removeFiles,
   editDisabled,
 }: {
   files: Record<string, string>;
   setFiles: (files: Record<string, string>) => Promise<void>;
   removeFile: (virtualPath: string) => Promise<void>;
+  removeFiles: (
+    virtualPaths: string[]
+  ) => Promise<{ deleted: string[]; errors: { path: string; reason: string }[] }>;
   editDisabled: boolean;
 }) {
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<string[] | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [anchor, setAnchor] = useState<string | null>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  const filePaths = useMemo(() => Object.keys(files), [files]);
+
+  // Drop selection entries for files that no longer exist (e.g., after a refresh
+  // that removed something while a stale set was held).
+  useEffect(() => {
+    setSelected((prev) => {
+      const valid = new Set<string>();
+      let changed = false;
+      for (const p of prev) {
+        if (files[p] !== undefined) valid.add(p);
+        else changed = true;
+      }
+      return changed ? valid : prev;
+    });
+  }, [files]);
 
   const handleSaveFile = useCallback(
     async (fileName: string, content: string) => {
@@ -114,59 +178,177 @@ export function FilesPopover({
     [files, setFiles]
   );
 
+  const clearSelection = useCallback(() => {
+    setSelected(new Set());
+    setAnchor(null);
+  }, []);
+
+  const selectAll = useCallback(() => {
+    setSelected(new Set(filePaths));
+  }, [filePaths]);
+
+  const onToggleSelect = useCallback(
+    (path: string, event: React.MouseEvent) => {
+      const isShift = event.shiftKey;
+      setSelected((prev) => {
+        const next = new Set(prev);
+        if (isShift && anchor && anchor !== path) {
+          const i = filePaths.indexOf(anchor);
+          const j = filePaths.indexOf(path);
+          if (i !== -1 && j !== -1) {
+            const [lo, hi] = i < j ? [i, j] : [j, i];
+            // Shift extends the selection — add the range, don't toggle off existing.
+            for (let k = lo; k <= hi; k++) next.add(filePaths[k]);
+            return next;
+          }
+        }
+        if (next.has(path)) next.delete(path);
+        else next.add(path);
+        return next;
+      });
+      // Anchor follows the most recent direct click (range extensions keep the
+      // existing anchor so successive shift-clicks pivot from it).
+      if (!isShift) setAnchor(path);
+    },
+    [anchor, filePaths]
+  );
+
+  const onWrapperKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (e.key === "Escape" && selected.size > 0) {
+        e.preventDefault();
+        clearSelection();
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "a") {
+        if (filePaths.length === 0) return;
+        e.preventDefault();
+        selectAll();
+      }
+    },
+    [selected.size, clearSelection, selectAll, filePaths.length]
+  );
+
+  // Auto-focus the wrapper when a selection appears so Esc / Cmd+A work
+  // without the user having to click into empty space first.
+  useEffect(() => {
+    if (selected.size > 0) wrapperRef.current?.focus();
+  }, [selected.size]);
+
   const handleConfirmDelete = useCallback(async () => {
-    if (!pendingDelete) return;
-    const target = pendingDelete;
+    if (!pendingDelete || pendingDelete.length === 0) return;
+    const targets = pendingDelete;
     setDeleting(true);
     try {
-      await removeFile(target);
-      const name = target.split("/").pop() || target;
-      toast.success(`Deleted ${name}`);
+      if (targets.length === 1) {
+        const target = targets[0];
+        await removeFile(target);
+        const name = target.split("/").pop() || target;
+        toast.success(`Deleted ${name}`);
+        if (selectedFile?.path === target) setSelectedFile(null);
+      } else {
+        const { deleted, errors } = await removeFiles(targets);
+        if (errors.length === 0) {
+          toast.success(`Deleted ${deleted.length} files`);
+        } else if (deleted.length === 0) {
+          toast.error(`Failed to delete ${errors.length} file${errors.length === 1 ? "" : "s"}`);
+        } else {
+          toast.warning(`Deleted ${deleted.length} of ${targets.length} (${errors.length} failed)`);
+        }
+        if (selectedFile && deleted.includes(selectedFile.path)) setSelectedFile(null);
+        // Keep failed paths selected so the user can see what's left; drop the rest.
+        const failedPaths = new Set(errors.map((e) => e.path));
+        setSelected(failedPaths);
+        if (failedPaths.size === 0) setAnchor(null);
+      }
       setPendingDelete(null);
-      if (selectedFile?.path === target) setSelectedFile(null);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Delete failed");
     } finally {
       setDeleting(false);
     }
-  }, [pendingDelete, removeFile, selectedFile]);
+  }, [pendingDelete, removeFile, removeFiles, selectedFile]);
 
-  const requestDelete = useCallback((path: string) => setPendingDelete(path), []);
+  const requestDelete = useCallback((path: string) => setPendingDelete([path]), []);
+
+  const pendingNames = useMemo(
+    () => (pendingDelete ?? []).map((p) => p.split("/").pop() || p),
+    [pendingDelete]
+  );
 
   return (
     <>
-      {Object.keys(files).length === 0 ? (
+      {filePaths.length === 0 ? (
         <div className="flex h-full items-center justify-center p-4 text-center">
           <p className="text-xs text-muted-foreground">No files created yet</p>
         </div>
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-2">
-          {Object.keys(files).map((file) => {
-            const filePath = String(file);
-            const rawContent = files[file];
-            let fileContent: string;
-            if (typeof rawContent === "object" && rawContent !== null && "content" in rawContent) {
-              const contentArray = (rawContent as { content: unknown }).content;
-              if (Array.isArray(contentArray)) {
-                fileContent = contentArray.join("\n");
+        <div ref={wrapperRef} tabIndex={-1} onKeyDown={onWrapperKeyDown} className="outline-none">
+          {selected.size > 0 && (
+            <div className="bg-muted-secondary sticky top-0 z-10 mb-2 flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-sm">
+              <span className="text-muted-foreground">
+                <span className="font-medium text-foreground">{selected.size}</span> selected
+              </span>
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={selectAll}
+                  disabled={selected.size === filePaths.length}
+                >
+                  Select all
+                </Button>
+                <Button type="button" variant="ghost" size="sm" onClick={clearSelection}>
+                  Clear
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setPendingDelete([...selected])}
+                  disabled={editDisabled}
+                >
+                  <Trash2 size={14} className="mr-1.5" />
+                  Delete
+                </Button>
+              </div>
+            </div>
+          )}
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-2">
+            {filePaths.map((file) => {
+              const filePath = String(file);
+              const rawContent = files[file];
+              let fileContent: string;
+              if (
+                typeof rawContent === "object" &&
+                rawContent !== null &&
+                "content" in rawContent
+              ) {
+                const contentArray = (rawContent as { content: unknown }).content;
+                if (Array.isArray(contentArray)) {
+                  fileContent = contentArray.join("\n");
+                } else {
+                  fileContent = String(contentArray || "");
+                }
               } else {
-                fileContent = String(contentArray || "");
+                fileContent = String(rawContent || "");
               }
-            } else {
-              fileContent = String(rawContent || "");
-            }
 
-            return (
-              <FileCard
-                key={filePath}
-                filePath={filePath}
-                fileContent={fileContent}
-                editDisabled={editDisabled}
-                onOpen={setSelectedFile}
-                onRequestDelete={requestDelete}
-              />
-            );
-          })}
+              return (
+                <FileCard
+                  key={filePath}
+                  filePath={filePath}
+                  fileContent={fileContent}
+                  editDisabled={editDisabled}
+                  selected={selected.has(filePath)}
+                  onOpen={setSelectedFile}
+                  onRequestDelete={requestDelete}
+                  onToggleSelect={onToggleSelect}
+                />
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -187,10 +369,36 @@ export function FilesPopover({
         }}
       >
         <DialogContent className="max-w-md">
-          <DialogTitle>Delete file?</DialogTitle>
-          <DialogDescription>
-            <span className="font-mono text-foreground">{pendingDelete?.split("/").pop()}</span>{" "}
-            will be permanently removed. This cannot be undone.
+          <DialogTitle>
+            {pendingDelete && pendingDelete.length > 1
+              ? `Delete ${pendingDelete.length} files?`
+              : "Delete file?"}
+          </DialogTitle>
+          <DialogDescription asChild>
+            <div>
+              {pendingDelete && pendingDelete.length === 1 ? (
+                <>
+                  <span className="font-mono text-foreground">{pendingNames[0]}</span> will be
+                  permanently removed. This cannot be undone.
+                </>
+              ) : (
+                <>
+                  <span>
+                    The following files will be permanently removed. This cannot be undone.
+                  </span>
+                  <ul className="mt-2 max-h-40 list-disc space-y-0.5 overflow-y-auto pl-5 font-mono text-foreground">
+                    {pendingNames.slice(0, DELETE_PREVIEW_LIMIT).map((n) => (
+                      <li key={n}>{n}</li>
+                    ))}
+                  </ul>
+                  {pendingNames.length > DELETE_PREVIEW_LIMIT && (
+                    <span className="mt-1 block text-xs text-muted-foreground">
+                      and {pendingNames.length - DELETE_PREVIEW_LIMIT} more
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
           </DialogDescription>
           <DialogFooter>
             <Button
@@ -222,7 +430,7 @@ export const TasksFilesSidebar = React.memo<{
   files: Record<string, string>;
   setFiles: (files: Record<string, string>) => Promise<void>;
 }>(({ todos, files, setFiles }) => {
-  const { isLoading, interrupt, removeFile } = useChatContext();
+  const { isLoading, interrupt, removeFile, removeFiles } = useChatContext();
   const [tasksOpen, setTasksOpen] = useState(false);
   const [filesOpen, setFilesOpen] = useState(false);
 
@@ -340,6 +548,7 @@ export const TasksFilesSidebar = React.memo<{
               files={files}
               setFiles={setFiles}
               removeFile={removeFile}
+              removeFiles={removeFiles}
               editDisabled={isLoading === true || interrupt !== undefined}
             />
           )}
