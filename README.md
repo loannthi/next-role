@@ -252,7 +252,7 @@ Because NextRole runs on the **LangGraph Agent Server**, the `career_agent` assi
 - **A2A** — Google's Agent2Agent protocol at **`/a2a/{assistant_id}`** (JSON-RPC 2.0; `message/send` + `message/stream`). → [docs](https://docs.langchain.com/langsmith/server-a2a)
 - The full server API is browsable at the **`/docs`** endpoint of your deployment.
 
-![NextRole MCP and A2A components](docs/images/next-role-mcp-a2a.png)
+![NextRole Agent Expose](docs/images/next-role-agent-expose.png)
 
 </details>
 
