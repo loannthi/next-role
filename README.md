@@ -118,7 +118,7 @@ Models are swappable **at runtime** — no rebuild. Open the in-app **Configurat
 
 - **Tavily** and **LlamaCloud** both include a generous monthly free tier — plenty for local use.
 - **Google AI Studio** offers a free tier for Gemini `flash` / `lite` models.
-- **Fully local** — point `OPENAI_API_BASE` at [LM Studio](https://lmstudio.ai/) or [Ollama](https://ollama.com/) (both expose an OpenAI-compatible API) and select your local model in the UI; `gpt-oss-20b` works well for the agent.
+- **Fully local** — point `OPENAI_API_BASE` at [LM Studio](https://lmstudio.ai/) or [Ollama](https://ollama.com/) (both expose an OpenAI-compatible API) and fill your local model in the UI.
 
 Output quality tracks the model you pick — smaller local models trade some quality for zero cost.
 
@@ -141,57 +141,13 @@ Output quality tracks the model you pick — smaller local models trade some qua
 
 NextRole is a **supervisor agent orchestrating three specialist subagents** on LangGraph + DeepAgents. The main agent handles intake, document processing, and the final battlecard; it delegates research, resume tailoring, and interview coaching to declarative subagents (defined in `subagents.yaml`, each with its own model, tools, and skills).
 
-```mermaid
-flowchart TB
-    User(["User: CV + JD or JD URL"])
-    subgraph Supervisor["Main Agent · supervisor"]
-        MA["career_agent<br/>intake · document processing<br/>battlecard authoring · multi-turn routing"]
-        MT["Tools: parse_document · extract_jd<br/>render_battlecard_pdf · list_files<br/>overwrite_file · write_todos · task"]
-    end
-    subgraph Subagents["Declarative subagents · via task tool"]
-        R["hiring-recon<br/>+ web_search · web_extract"]
-        T["resume-tailor<br/>+ prepare_render_settings"]
-        C["interview-coach<br/>default tools only"]
-    end
-    OutR["/research/&lt;r&gt;/&lt;j&gt;.md"]
-    OutT["/tailored_resume/&lt;r&gt;/&lt;j&gt;.yaml + .pdf"]
-    OutC["/interview_coach/&lt;r&gt;/&lt;j&gt;.md"]
-    OutB["/interview_battlecard/&lt;r&gt;/&lt;j&gt;.json + .pdf"]
-    User --> MA
-    MA -. delegates .-> R
-    MA -. delegates .-> T
-    MA -. delegates .-> C
-    R --> OutR
-    T --> OutT
-    C --> OutC
-    MA --> OutB
-    OutR -. context .-> T
-    OutR -. context .-> C
-```
+![NextRole architecture](docs/images/next-role-architecture.png)
 
 ## How It Works
 
 A five-stage pipeline. Stage 4 runs the resume tailor and interview coach **in parallel**; Stage 6 routes follow-up edits to whichever agent owns the target file.
 
-```mermaid
-flowchart TB
-    S1["Stage 1 · Intake<br/>collect CV, JD, prep timeline, context"]
-    S2["Stage 2 · Process documents<br/>parse_document / extract_jd → /processed/<br/>persist intake"]
-    S3["Stage 3 · hiring-recon<br/>company + role research → /research/"]
-    Fork{{"Stage 4 · run in parallel"}}
-    S4a["resume-tailor<br/>YAML → /tailored_resume/<br/>rendercv renders PDF"]
-    S4b["interview-coach<br/>STAR prep doc → /interview_coach/"]
-    Join(("join"))
-    S5["Stage 5 · Interview battlecard<br/>main agent writes JSON<br/>render_battlecard_pdf → PDF"]
-    S6(["Stage 6 · Multi-turn updates<br/>routed to the agent that owns the file"])
-    S1 --> S2 --> S3 --> Fork
-    Fork --> S4a
-    Fork --> S4b
-    S4a --> Join
-    S4b --> Join
-    Join --> S5 --> S6
-    S6 -. iterate .-> S6
-```
+![How NextRole works](docs/images/how-next-role-works.png)
 
 <details>
 <summary><b>Stage-by-stage detail</b></summary>
@@ -296,31 +252,7 @@ Because NextRole runs on the **LangGraph Agent Server**, the `career_agent` assi
 - **A2A** — Google's Agent2Agent protocol at **`/a2a/{assistant_id}`** (JSON-RPC 2.0; `message/send` + `message/stream`). → [docs](https://docs.langchain.com/langsmith/server-a2a)
 - The full server API is browsable at the **`/docs`** endpoint of your deployment.
 
-```mermaid
-flowchart LR
-    Browser(["Browser"])
-    subgraph Compose["docker compose up -d"]
-        FE["frontend · Next.js 16 + React 19<br/>node:24-alpine · useStream()"]
-        BE["backend · langchain/langgraph-api:3.13<br/>career_agent assistant"]
-        PG[("postgres · pgvector/pgvector:pg18")]
-        RD[("redis:8")]
-    end
-    LLM["LLM providers<br/>OpenAI · Anthropic · Google"]
-    TAV["Tavily web search"]
-    LP["LlamaParse · LlamaCloud"]
-    LS["LangSmith traces"]
-    Ext(["External clients<br/>MCP / A2A"])
-    Browser --> FE
-    FE -->|streaming chat| BE
-    BE --- PG
-    BE --- RD
-    BE --> LLM
-    BE --> TAV
-    BE --> LP
-    BE -. traces .-> LS
-    Ext -->|/mcp · Streamable HTTP| BE
-    Ext -->|/a2a/career_agent · JSON-RPC 2.0| BE
-```
+![NextRole MCP and A2A components](docs/images/next-role-mcp-a2a.png)
 
 </details>
 
