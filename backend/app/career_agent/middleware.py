@@ -62,47 +62,88 @@ def _resolve_model(name: str) -> BaseChatModel | None:
     return model
 
 
+# Feature toggle (see PRD 16). Subagents don't stream tokens by default, because
+# parallel subagents streaming large tool-call args trigger an O(n^2) chunk
+# concat in the LangGraph SDK and hang the client. Flip to `False` — here for a
+# global default, or per run via `configurable.disable_subagent_streaming` — to
+# restore live subagent token streaming once the frontend/SDK is fixed for good.
+DISABLE_SUBAGENT_STREAMING: bool = True
+
+
+def _without_streaming(model: BaseChatModel) -> BaseChatModel:
+    """Return a copy of `model` with token streaming disabled.
+
+    Subagents must not stream tokens: when two run in parallel and both emit a
+    large tool-call argument (e.g. `overwrite_file`'s `new_content`), the
+    LangGraph SDK's per-token `MessageTupleManager.concat` is O(n^2) and hangs
+    the client. `disable_streaming` makes the model defer to `(a)invoke`, so
+    LangGraph emits one complete message per step instead of token deltas.
+
+    `model_copy` leaves the shared/cached instance untouched — the main agent
+    may use the same `provider:model` string (`openai:gpt-5.4` is shared with
+    `resume-tailor`) and must keep streaming.
+    """
+    try:
+        return model.model_copy(update={"disable_streaming": True})
+    except Exception:  # never break a real run over a streaming tweak
+        logger.warning("could not disable streaming on %r; leaving as-is", model)
+        return model
+
+
 class ModelOverrideMiddleware(AgentMiddleware):
-    """Swap the request model based on runtime `configurable` values.
+    """Shape the request model per main-agent-vs-subagent context.
 
-    Reads two keys from `RunnableConfig.configurable`:
-      - `main_agent_model` — applies to the top-level career_agent call.
-      - `subagent_model`   — applies to every declarative subagent call.
+    Two responsibilities, both keyed off whether the call belongs to a subagent:
 
-    The two are differentiated by `metadata.lc_agent_name`, which
+    1. **Model override.** Reads two `RunnableConfig.configurable` keys:
+         - `main_agent_model` — applies to the top-level career_agent call.
+         - `subagent_model`   — applies to every declarative subagent call.
+       When the matching key is missing/empty or `init_chat_model` fails, the
+       bake-time default (`_MODEL` in `agents.py`; `model:` in `subagents.yaml`)
+       still wins.
+
+    2. **Disable streaming for subagents.** When `DISABLE_SUBAGENT_STREAMING`
+       is on (module default; overridable per run via
+       `configurable.disable_subagent_streaming`), every subagent call (override
+       or default model) gets `disable_streaming=True` so parallel subagents
+       emitting large tool-call args don't flood the client (see
+       `_without_streaming`). The main agent always keeps streaming.
+
+    Subagent vs. main is differentiated by `metadata.lc_agent_name`, which
     deepagents stamps onto each subagent's runnable (see
     `deepagents/middleware/subagents.py` → `with_config({"metadata":
     {"lc_agent_name": ...}})`). Absent → main agent.
-
-    When the matching key is missing/empty or `init_chat_model` fails, the
-    request passes through unchanged so the agent's bake-time default
-    (`_MODEL` in `agents.py` for the main agent, `model:` in
-    `subagents.yaml` for each subagent) still wins.
     """
 
     @staticmethod
-    def _pick_override() -> str | None:
+    def _read_config() -> tuple[bool, str | None, bool]:
+        """Return `(is_subagent, model_name_override, disable_subagent_streaming)`."""
         try:
             config = get_config()
         except RuntimeError:
-            # Called outside a runnable context (e.g. a unit test that
-            # invokes the middleware directly). Nothing to override.
-            return None
+            # Called outside a runnable context (e.g. a unit test that invokes
+            # the middleware directly). Treat as main agent, no override, no-op.
+            return False, None, False
         configurable = config.get("configurable") or {}
         metadata = config.get("metadata") or {}
+        disable_streaming = configurable.get("disable_subagent_streaming")
+        if disable_streaming is None:  # not set per run → fall back to the module default
+            disable_streaming = DISABLE_SUBAGENT_STREAMING
         if metadata.get("lc_agent_name"):
-            return configurable.get("subagent_model") or None
-        return configurable.get("main_agent_model") or None
+            return True, configurable.get("subagent_model") or None, bool(disable_streaming)
+        return False, configurable.get("main_agent_model") or None, bool(disable_streaming)
 
     @classmethod
     def _maybe_override(cls, request: Any) -> Any:  # noqa: ANN401
-        name = cls._pick_override()
-        if not name:
-            return request
-        model = _resolve_model(name)
-        if model is None:
-            return request
-        return request.override(model=model)
+        is_subagent, name, disable_streaming = cls._read_config()
+        model = _resolve_model(name) if name else None  # None → keep request's default
+        if is_subagent and disable_streaming:
+            # Disable streaming on whichever model the subagent ends up using.
+            base = model if model is not None else request.model
+            return request.override(model=_without_streaming(base))
+        if model is not None:
+            return request.override(model=model)
+        return request
 
     def wrap_model_call(self, request: Any, handler: Any) -> Any:  # noqa: ANN401
         """Sync entry point."""
