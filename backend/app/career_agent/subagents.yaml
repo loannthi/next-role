@@ -32,7 +32,7 @@ resume-tailor:
     resume_path, jd_path, intake_path (optional), research_path, yaml_path. The
     YAML is written to yaml_path and the .typ + .pdf siblings are produced next
     to it under `/tailored_resume/<resume>/`.
-  model: openai:gpt-5.4-mini
+  model: openai:gpt-5.4
   tools:
     - prepare_render_settings
   skills:
