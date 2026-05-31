@@ -53,13 +53,9 @@ Preparing for an interview takes hours of tedious resume tailoring and company r
 
 ## Demo
 
-> 📸 _Screenshots coming soon._ In the meantime, run it locally in ~2 minutes (below) — chat on the left, a live workspace of generated files on the right, each downloadable as a polished PDF.
-
-<!-- Suggested slots once captured:
-| Chat & streaming | Workspace / files | Tailored resume PDF |
-| --- | --- | --- |
-| ![chat](docs/images/screenshot-chat.png) | ![files](docs/images/screenshot-files.png) | ![pdf](docs/images/screenshot-pdf.png) |
--->
+<video src="https://github.com/user-attachments/assets/39995750-b0be-4d59-a98b-b3ec109a509c" width="100%" controls>
+  Your browser does not support the video tag.
+</video>
 
 ## Quick Start
 
