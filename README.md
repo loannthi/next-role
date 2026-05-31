@@ -272,6 +272,7 @@ Set `LANGCHAIN_API_KEY` and `LANGCHAIN_TRACING_V2=true` in `.env`, and every run
 - 📦 **Remote sandboxes** — swap `LocalShellBackend` for an isolated remote sandbox (e.g. [Daytona](https://www.daytona.io/)) so render/shell steps are safe for multi-tenant use.
 - 📊 **Agent evaluation** — LangSmith evals over the workflow (the `@pytest.mark.eval` marker is already reserved).
 - 🎨 **Enhanced UI** — richer artifact editing, diff views, and inline regeneration.
+- ⚡ **React streaming SDK migration** — evaluate `@langchain/react` to replace the current frontend `useStream` integration, using selector-based subagent subscriptions to avoid UI hangs when parallel subagents stream large tool inputs such as `write_file.content`.
 - 🔌 **MCP / A2A examples** — sample integrations driving `career_agent` from external agents and IDEs.
 - 🧵 **Per-thread / multi-user scoping** — namespace artifacts per user instead of the current global layout.
 - 🌐 **More sources & ATS-aware tailoring** — pluggable retrievers + keyword/ATS optimization passes.
