@@ -29,8 +29,6 @@
 ![LangSmith](https://img.shields.io/badge/Observability-LangSmith-FF6F61)
 ![Exposes MCP + A2A](https://img.shields.io/badge/exposes-MCP%20%2B%20A2A-0A7EA4)
 
-<img alt="NextRole demo" src="docs/images/next-role-demo.gif" width="760">
-
 </div>
 
 ---
