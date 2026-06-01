@@ -29,10 +29,7 @@
 ![LangSmith](https://img.shields.io/badge/Observability-LangSmith-FF6F61)
 ![Exposes MCP + A2A](https://img.shields.io/badge/exposes-MCP%20%2B%20A2A-0A7EA4)
 
-<!-- DEMO PLACEHOLDER — drop a 10-20s GIF (chat → files panel → PDF preview) at docs/images/demo.gif.
-     This is the single highest-leverage asset; add it first.
-<img alt="NextRole demo" src="docs/images/demo.gif" width="760">
--->
+<img alt="NextRole demo" src="docs/images/next-role-demo.gif" width="760">
 
 </div>
 
