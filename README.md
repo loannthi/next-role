@@ -52,6 +52,8 @@ Preparing for an interview takes hours of tedious resume tailoring and company r
   Your browser does not support the video tag.
 </video>
 
+▶️ **[Watch the full walkthrough in HD on YouTube »](https://youtu.be/YUFFjFgR4Ig)**
+
 ## Quick Start
 
 The whole stack — frontend, backend, Postgres, Redis — runs in Docker.
