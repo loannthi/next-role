@@ -1,6 +1,6 @@
 ---
 name: upgrade-backend-deps
-description: Upgrade Python backend dependencies to their latest compatible versions. Resolves the lockfile with `uv lock --upgrade`, syncs the venv, bumps the matching `>=` pins in `backend/pyproject.toml` and `ruff-pre-commit` rev in `.pre-commit-config.yaml`, rebuilds the backend Docker image if requested, opens a PR with the change (watching CI for upgrade fallout), and reports what moved vs. what stayed pinned by transitive constraints. Use when the user says "upgrade backend libs", "bump backend deps", "update Python dependencies", or after they've manually run `uv lock --upgrade` and want the pyproject/config files reconciled.
+description: Upgrade Python backend dependencies to their latest compatible versions. Resolves the lockfile with `uv lock --upgrade`, syncs the venv, bumps the matching `>=` pins in `backend/pyproject.toml` and `ruff-pre-commit` rev in `.pre-commit-config.yaml`, runs the backend unit tests, rebuilds the backend Docker image if requested, opens a PR with the change (watching CI for upgrade fallout), and reports what moved vs. what stayed pinned by transitive constraints. Use when the user says "upgrade backend libs", "bump backend deps", "update Python dependencies", or after they've manually run `uv lock --upgrade` and want the pyproject/config files reconciled.
 ---
 
 Upgrade the backend's Python dependencies, reconcile the version pins in tracked config, and (optionally) rebuild the Docker image so the running container picks up the new versions.
@@ -15,7 +15,7 @@ uv lock --upgrade 2>&1 | tee /tmp/uv-upgrade.log
 uv sync
 ```
 
-`uv lock --upgrade` re-resolves every dep against PyPI within the constraint set in `pyproject.toml`. Its stdout lists every `Updated <pkg> vX -> vY` line — that diff is the source of truth for steps 2, 3, and 9. Keep it.
+`uv lock --upgrade` re-resolves every dep against PyPI within the constraint set in `pyproject.toml`. Its stdout lists every `Updated <pkg> vX -> vY` line — that diff is the source of truth for steps 2, 3, 5, and 11. Keep it.
 
 If the log shows `Resolved N packages` with no `Updated` lines, also check whether the lockfile itself changed:
 
@@ -24,7 +24,7 @@ git diff --stat backend/uv.lock
 ```
 
 - **No diff at all** → truly up to date. Stop and report "already up to date."
-- **Diff exists but only inside `[package.metadata] requires-dist`** → no packages moved, but `pyproject.toml` was edited out-of-band since the last lock and the metadata block just got re-synced. Skip steps 2–7 (nothing to bump or rebuild — step 4's reconcile already happened as part of this `--upgrade` run) and jump to step 8 to lint, then step 9 to commit/open a PR (the reconciled `uv.lock` still needs to land), then step 10 to report.
+- **Diff exists but only inside `[package.metadata] requires-dist`** → no packages moved, but `pyproject.toml` was edited out-of-band since the last lock and the metadata block just got re-synced. Skip steps 2–8 (nothing to bump, test, or rebuild — step 4's reconcile already happened as part of this `--upgrade` run, and no installed versions changed) and jump to step 9 to lint, then step 10 to commit/open a PR (the reconciled `uv.lock` still needs to land), then step 11 to report.
 - **Diff includes `version = "..."` lines** → real version moves; continue with steps 2 onward.
 
 ### 2. Bump pins in `backend/pyproject.toml`
@@ -54,15 +54,29 @@ Plain `uv lock` re-snapshots `pyproject.toml` into the lockfile's `[package.meta
 
 This should be a fast (sub-second) no-op resolve. If it reports `Updated <pkg>` lines here, something raised a floor above the previously locked version — go back to step 2 and treat it as a real upgrade.
 
-### 5. Check the backend container state
+### 5. Run the backend unit tests locally
+
+`uv sync` (step 1) already installed the upgraded deps into the host venv, so the suite now exercises the new versions. Run it before committing — a dependency bump can change behavior, not just version numbers, and this is a seconds-long gate versus a multi-minute CI round-trip:
+
+```bash
+uv run pytest   # from backend/; unit tests only — addopts excludes integration + eval
+```
+
+If something fails it's almost always an upgraded library changing a contract — diagnose the offending package (cross-check the `uv lock --upgrade` log), fix it, and stage the fix alongside the config edits when you commit (step 10). Don't push a known-red upgrade.
+
+> Real example: a `deepagents` 0.6.x bump changed `CompositeBackend.ls()` to report a missing directory as a `path_not_found` error instead of an empty listing, which broke `list_files`. The fix was to normalize it back to `[]`. This local run is exactly the gate that catches that before CI.
+
+Integration tests (`uv run pytest -m integration`) need the local stack up — run them too if it's already running, but don't start it just for this.
+
+### 6. Check the backend container state
 
 ```bash
 docker ps --filter "name=backend" --format '{{.Names}} {{.Status}}'
 ```
 
-Remember whether it was running — needed in step 7.
+Remember whether it was running — needed in step 8.
 
-### 6. Rebuild the backend image
+### 7. Rebuild the backend image
 
 ```bash
 docker compose build --no-cache backend
@@ -70,10 +84,10 @@ docker compose build --no-cache backend
 
 `--no-cache` because the Dockerfile's `pip install -c /api/constraints.txt -e /deps/*` step can otherwise reuse a stale layer. The rebuild is heavy (a few minutes) — if the user only edited config and doesn't need the container image refreshed yet, ask before running this step.
 
-### 7. Restart the container only if it was running before
+### 8. Restart the container only if it was running before
 
 ```bash
-docker compose up -d backend   # only if step 5 showed it was up
+docker compose up -d backend   # only if step 6 showed it was up
 ```
 
 Don't start the container if the user had it stopped — they may have stopped it intentionally. After restart, verify health:
@@ -83,7 +97,7 @@ docker compose ps backend
 docker compose logs backend --tail 30
 ```
 
-### 8. Lint the edited config files
+### 9. Lint the edited config files
 
 ```bash
 cd ..  # back to repo root
@@ -92,7 +106,7 @@ pre-commit run --files backend/pyproject.toml .pre-commit-config.yaml backend/uv
 
 This runs `toml-sort` / yaml checks so the edits match the repo's formatting. Include `backend/uv.lock` so any reconciliation from step 4 gets validated too.
 
-### 9. Commit and open a PR
+### 10. Commit and open a PR
 
 Once lint is green, land the change on a branch and open a PR — don't commit dep bumps straight to the default branch (`main` is protected, and its CI checks are exactly what catch upgrade fallout).
 
@@ -101,23 +115,21 @@ cd ..  # repo root, if not already there
 git switch -c chore/upgrade-backend-deps   # skip if already on a non-default branch (e.g. a worktree branch)
 git add backend/pyproject.toml backend/uv.lock .pre-commit-config.yaml
 # also stage any source/test files you touched to fix upgrade fallout (see below)
-git commit -m "chore: upgrade backend dependencies"   # Conventional Commit; put the step-10 summary in the body
+git commit -m "chore: upgrade backend dependencies"   # Conventional Commit; put the step-11 summary in the body
 git push -u origin HEAD
 ```
 
-Then open the PR against `main`. This repo prefers the **GitHub MCP tools** for repo interactions, so use `mcp__github__create_pull_request` (owner `tam159`, repo `next-role`, base `main`) rather than `gh pr create`. Reuse the upgraded / held-back summary from step 10 as the PR body.
+Then open the PR against `main`. This repo prefers the **GitHub MCP tools** for repo interactions, so use `mcp__github__create_pull_request` (owner `tam159`, repo `next-role`, base `main`) rather than `gh pr create`. Reuse the upgraded / held-back summary from step 11 as the PR body.
 
-**Watch CI and fix fallout — dependency upgrades routinely break tests.** A bumped library can change behavior, not just its version number. Watch the PR's `code-quality` and `backend-tests` checks; if one fails, diagnose whether an upgraded library changed a contract, fix it **in the same PR**, and push again:
+**Watch CI even though step 5 passed.** CI runs on a different Python than the host venv (3.14 vs 3.13 here), so it can still surface a failure the local suite didn't. Watch the PR's `code-quality` and `backend-tests` checks; if one fails, fix it **in the same PR** and push again:
 
 ```bash
 gh run watch <run-id> --repo tam159/next-role --exit-status
 ```
 
-> Example from a past run: a `deepagents` bump changed `CompositeBackend.ls()` to report a missing directory as a `path_not_found` error instead of an empty listing, which broke `list_files`. The fix (normalizing it back to `[]`) belonged in the upgrade PR, not a separate one.
-
 Leave the actual merge to the user unless they explicitly ask you to merge.
 
-### 10. Report
+### 11. Report
 
 Pick the shape that matches what actually happened:
 
