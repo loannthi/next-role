@@ -1,6 +1,6 @@
 ---
 name: upgrade-backend-deps
-description: Upgrade Python backend dependencies to their latest compatible versions. Resolves the lockfile with `uv lock --upgrade`, syncs the venv, bumps the matching `>=` pins in `backend/pyproject.toml` and `ruff-pre-commit` rev in `.pre-commit-config.yaml`, rebuilds the backend Docker image if requested, and reports what moved vs. what stayed pinned by transitive constraints. Use when the user says "upgrade backend libs", "bump backend deps", "update Python dependencies", or after they've manually run `uv lock --upgrade` and want the pyproject/config files reconciled.
+description: Upgrade Python backend dependencies to their latest compatible versions. Resolves the lockfile with `uv lock --upgrade`, syncs the venv, bumps the matching `>=` pins in `backend/pyproject.toml` and `ruff-pre-commit` rev in `.pre-commit-config.yaml`, rebuilds the backend Docker image if requested, opens a PR with the change (watching CI for upgrade fallout), and reports what moved vs. what stayed pinned by transitive constraints. Use when the user says "upgrade backend libs", "bump backend deps", "update Python dependencies", or after they've manually run `uv lock --upgrade` and want the pyproject/config files reconciled.
 ---
 
 Upgrade the backend's Python dependencies, reconcile the version pins in tracked config, and (optionally) rebuild the Docker image so the running container picks up the new versions.
@@ -24,7 +24,7 @@ git diff --stat backend/uv.lock
 ```
 
 - **No diff at all** → truly up to date. Stop and report "already up to date."
-- **Diff exists but only inside `[package.metadata] requires-dist`** → no packages moved, but `pyproject.toml` was edited out-of-band since the last lock and the metadata block just got re-synced. Skip steps 2–7 (nothing to bump or rebuild — step 4's reconcile already happened as part of this `--upgrade` run) and jump to step 8 to lint, then step 9 to report.
+- **Diff exists but only inside `[package.metadata] requires-dist`** → no packages moved, but `pyproject.toml` was edited out-of-band since the last lock and the metadata block just got re-synced. Skip steps 2–7 (nothing to bump or rebuild — step 4's reconcile already happened as part of this `--upgrade` run) and jump to step 8 to lint, then step 9 to commit/open a PR (the reconciled `uv.lock` still needs to land), then step 10 to report.
 - **Diff includes `version = "..."` lines** → real version moves; continue with steps 2 onward.
 
 ### 2. Bump pins in `backend/pyproject.toml`
@@ -92,7 +92,32 @@ pre-commit run --files backend/pyproject.toml .pre-commit-config.yaml backend/uv
 
 This runs `toml-sort` / yaml checks so the edits match the repo's formatting. Include `backend/uv.lock` so any reconciliation from step 4 gets validated too.
 
-### 9. Report
+### 9. Commit and open a PR
+
+Once lint is green, land the change on a branch and open a PR — don't commit dep bumps straight to the default branch (`main` is protected, and its CI checks are exactly what catch upgrade fallout).
+
+```bash
+cd ..  # repo root, if not already there
+git switch -c chore/upgrade-backend-deps   # skip if already on a non-default branch (e.g. a worktree branch)
+git add backend/pyproject.toml backend/uv.lock .pre-commit-config.yaml
+# also stage any source/test files you touched to fix upgrade fallout (see below)
+git commit -m "chore: upgrade backend dependencies"   # Conventional Commit; put the step-10 summary in the body
+git push -u origin HEAD
+```
+
+Then open the PR against `main`. This repo prefers the **GitHub MCP tools** for repo interactions, so use `mcp__github__create_pull_request` (owner `tam159`, repo `next-role`, base `main`) rather than `gh pr create`. Reuse the upgraded / held-back summary from step 10 as the PR body.
+
+**Watch CI and fix fallout — dependency upgrades routinely break tests.** A bumped library can change behavior, not just its version number. Watch the PR's `code-quality` and `backend-tests` checks; if one fails, diagnose whether an upgraded library changed a contract, fix it **in the same PR**, and push again:
+
+```bash
+gh run watch <run-id> --repo tam159/next-role --exit-status
+```
+
+> Example from a past run: a `deepagents` bump changed `CompositeBackend.ls()` to report a missing directory as a `path_not_found` error instead of an empty listing, which broke `list_files`. The fix (normalizing it back to `[]`) belonged in the upgrade PR, not a separate one.
+
+Leave the actual merge to the user unless they explicitly ask you to merge.
+
+### 10. Report
 
 Pick the shape that matches what actually happened:
 
