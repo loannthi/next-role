@@ -58,8 +58,8 @@ export function PlanSection({ todos, open, onToggle }: PlanSectionProps) {
       onToggle={onToggle}
     >
       {todos.length === 0 ? (
-        <div className="border-primary/20 bg-primary/5 rounded-2xl border border-dashed px-4 py-5 text-center">
-          <div className="bg-primary/10 mx-auto mb-3 flex size-10 items-center justify-center rounded-2xl text-primary">
+        <div className="rounded-2xl border border-dashed border-primary/20 bg-primary/5 px-4 py-5 text-center">
+          <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
             <Sparkles size={18} />
           </div>
           <p className="text-base font-semibold text-foreground">No tasks yet</p>
@@ -69,13 +69,13 @@ export function PlanSection({ todos, open, onToggle }: PlanSectionProps) {
         </div>
       ) : (
         <div className="flex flex-col gap-4">
-          <div className="border-primary/15 overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/10 via-surface to-surface p-4 shadow-sm">
+          <div className="overflow-hidden rounded-2xl border border-primary/15 bg-linear-to-br from-primary/10 via-surface to-surface p-4 shadow-xs">
             <div className="flex items-center justify-between gap-3">
               <div className="text-sm font-semibold text-foreground">Progress</div>
               <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold tabular-nums text-primary">{progress}%</span>
+                <span className="text-sm font-semibold text-primary tabular-nums">{progress}%</span>
                 {activeCount > 0 && (
-                  <span className="border-warning/25 bg-warning/10 inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium text-warning">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-warning/25 bg-warning/10 px-2.5 py-1 text-xs font-medium text-warning">
                     <span className="size-1.5 animate-pulse rounded-full bg-warning" />
                     Active
                   </span>
@@ -92,10 +92,10 @@ export function PlanSection({ todos, open, onToggle }: PlanSectionProps) {
 
           {STATUS_ORDER.filter((s) => grouped[s].length > 0).map((status) => (
             <div key={status}>
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              <h3 className="mb-2 text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">
                 {STATUS_LABEL[status]}
               </h3>
-              <div className="relative flex flex-col gap-2 text-sm before:absolute before:bottom-2 before:left-[8px] before:top-2 before:w-px before:bg-border">
+              <div className="relative flex flex-col gap-2 text-sm before:absolute before:top-2 before:bottom-2 before:left-[8px] before:w-px before:bg-border">
                 {grouped[status].map((todo, idx) => (
                   <div
                     key={`${status}_${todo.id}_${idx}`}
@@ -106,9 +106,9 @@ export function PlanSection({ todos, open, onToggle }: PlanSectionProps) {
                     </span>
                     <span
                       className={cn(
-                        "bg-surface/70 break-words rounded-xl border border-border px-3 py-2 leading-relaxed shadow-sm",
+                        "rounded-xl border border-border bg-surface/70 px-3 py-2 leading-relaxed wrap-break-word shadow-xs",
                         status === "in_progress" &&
-                          "border-warning/30 bg-warning/10 shadow-warning/5 text-foreground",
+                          "border-warning/30 bg-warning/10 text-foreground shadow-warning/5",
                         status === "completed" &&
                           "bg-transparent text-muted-foreground line-through shadow-none"
                       )}

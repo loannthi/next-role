@@ -74,7 +74,7 @@ function FileCard({
         type="button"
         onClick={() => onOpen({ path: filePath, content: fileContent })}
         title={filePath}
-        className="hover:border-primary/25 w-full cursor-pointer space-y-2 rounded-xl border border-border bg-transparent px-3 py-4 shadow-sm transition-colors"
+        className="w-full cursor-pointer space-y-2 rounded-xl border border-border bg-transparent px-3 py-4 shadow-xs transition-colors hover:border-primary/25"
         onMouseEnter={(e) => {
           e.currentTarget.parentElement!.style.backgroundColor = "var(--color-file-button-hover)";
         }}
@@ -104,11 +104,11 @@ function FileCard({
           onToggleSelect(filePath, e);
         }}
         className={cn(
-          "absolute left-1.5 top-1.5 inline-flex size-5 items-center justify-center rounded border transition-opacity",
-          "focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+          "absolute top-1.5 left-1.5 inline-flex size-5 items-center justify-center rounded border transition-opacity",
+          "focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-hidden",
           selected
-            ? "text-primary-foreground border-primary bg-primary opacity-100"
-            : "hover:border-primary/60 border-border bg-background text-transparent opacity-0 group-hover:opacity-100"
+            ? "border-primary bg-primary opacity-100"
+            : "border-border bg-background text-transparent opacity-0 group-hover:opacity-100 hover:border-primary/60"
         )}
       >
         <Check size={12} strokeWidth={3} />
@@ -122,7 +122,7 @@ function FileCard({
           onRequestDelete(filePath);
         }}
         disabled={editDisabled}
-        className="absolute right-1.5 top-1.5 inline-flex size-7 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/15 hover:text-destructive focus-visible:opacity-100 disabled:pointer-events-none group-hover:opacity-100"
+        className="absolute top-1.5 right-1.5 inline-flex size-7 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:bg-destructive/15 hover:text-destructive focus-visible:opacity-100 disabled:pointer-events-none"
       >
         <Trash2 size={14} />
       </button>
@@ -280,7 +280,7 @@ export function FilesPopover({
           <p className="text-xs text-muted-foreground">No files created yet</p>
         </div>
       ) : (
-        <div ref={wrapperRef} tabIndex={-1} onKeyDown={onWrapperKeyDown} className="outline-none">
+        <div ref={wrapperRef} tabIndex={-1} onKeyDown={onWrapperKeyDown} className="outline-hidden">
           {selected.size > 0 && (
             <div className="bg-muted-secondary sticky top-0 z-10 mb-2 flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-sm">
               <span className="text-muted-foreground">
@@ -387,7 +387,7 @@ export function FilesPopover({
                   </span>
                   <ul className="mt-2 max-h-72 list-disc space-y-1 overflow-y-auto pl-5 font-mono text-foreground">
                     {pendingPaths.slice(0, DELETE_PREVIEW_LIMIT).map((p) => (
-                      <li key={p} className="break-words">
+                      <li key={p} className="wrap-break-word">
                         {p}
                       </li>
                     ))}
@@ -485,7 +485,7 @@ export const TasksFilesSidebar = React.memo<{
     <div className="min-h-0 w-full flex-1">
       <div className="font-inter flex h-full w-full flex-col p-0">
         <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
-          <div className="flex items-center justify-between px-3 pb-1.5 pt-2">
+          <div className="flex items-center justify-between px-3 pt-2 pb-1.5">
             <span className="text-xs font-semibold tracking-wide text-zinc-600">AGENT TASKS</span>
             <button
               onClick={() => setTasksOpen((v) => !v)}
@@ -509,7 +509,7 @@ export const TasksFilesSidebar = React.memo<{
                   <div className="ml-1 p-0.5">
                     {Object.entries(groupedTodos).map(([status, todos]) => (
                       <div className="mb-4">
-                        <h3 className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-tertiary">
+                        <h3 className="mb-1 text-[10px] font-semibold tracking-wider text-tertiary uppercase">
                           {groupedLabels[status as keyof typeof groupedLabels]}
                         </h3>
                         {todos.map((todo, index) => (
@@ -518,7 +518,7 @@ export const TasksFilesSidebar = React.memo<{
                             className="mb-1.5 flex items-start gap-2 rounded-sm p-1 text-sm"
                           >
                             {getStatusIcon(todo.status)}
-                            <span className="flex-1 break-words leading-relaxed text-inherit">
+                            <span className="flex-1 leading-relaxed wrap-break-word text-inherit">
                               {todo.content}
                             </span>
                           </div>
@@ -531,7 +531,7 @@ export const TasksFilesSidebar = React.memo<{
             </div>
           )}
 
-          <div className="flex items-center justify-between px-3 pb-1.5 pt-2">
+          <div className="flex items-center justify-between px-3 pt-2 pb-1.5">
             <span className="text-xs font-semibold tracking-wide text-zinc-600">FILE SYSTEM</span>
             <button
               onClick={() => setFilesOpen((v) => !v)}

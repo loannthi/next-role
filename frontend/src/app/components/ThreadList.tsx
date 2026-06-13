@@ -66,7 +66,7 @@ function StatusFilterItem({
       <span className={cn("inline-block size-2 rounded-full", getThreadColor(status))} />
       {label}
       {badge !== undefined && badge > 0 && (
-        <span className="ml-1 inline-flex items-center justify-center rounded-full bg-red-600 px-1.5 py-0.5 text-xs font-bold leading-none text-white">
+        <span className="ml-1 inline-flex items-center justify-center rounded-full bg-red-600 px-1.5 py-0.5 text-xs leading-none font-bold text-white">
           {badge}
         </span>
       )}
@@ -203,7 +203,7 @@ export function ThreadList({
   return (
     <div className="absolute inset-0 flex flex-col border-r border-border bg-background">
       {/* Header with title, filter, and close button */}
-      <div className="bg-surface/80 grid flex-shrink-0 grid-cols-[1fr_auto] items-center gap-3 border-b border-border p-4 backdrop-blur">
+      <div className="grid shrink-0 grid-cols-[1fr_auto] items-center gap-3 border-b border-border bg-surface/80 p-4 backdrop-blur-sm">
         <div>
           <h2 className="text-lg font-semibold tracking-tight">Threads</h2>
           <p className="text-xs text-muted-foreground">Conversation history</p>
@@ -270,7 +270,7 @@ export function ThreadList({
 
               return (
                 <div key={group} className="mb-4">
-                  <h4 className="m-0 px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  <h4 className="m-0 px-2 py-2 text-[11px] font-semibold tracking-[0.16em] text-muted-foreground uppercase">
                     {GROUP_LABELS[group]}
                   </h4>
                   <div className="flex flex-col gap-1">
@@ -283,7 +283,7 @@ export function ThreadList({
                           "grid w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-3 text-left transition-all duration-200",
                           "hover:border-primary/20 hover:bg-surface-raised",
                           currentThreadId === thread.id
-                            ? "border-primary/40 border bg-accent shadow-sm hover:bg-accent"
+                            ? "border border-primary/40 bg-accent shadow-xs hover:bg-accent"
                             : "border border-transparent bg-transparent"
                         )}
                         aria-current={currentThreadId === thread.id}
@@ -294,7 +294,7 @@ export function ThreadList({
                             <h3 className="truncate text-sm font-semibold text-foreground">
                               {thread.title}
                             </h3>
-                            <span className="ml-2 flex-shrink-0 text-xs text-muted-foreground">
+                            <span className="ml-2 shrink-0 text-xs text-muted-foreground">
                               {formatTime(thread.updatedAt)}
                             </span>
                           </div>
@@ -303,7 +303,7 @@ export function ThreadList({
                             <p className="flex-1 truncate text-xs text-muted-foreground">
                               {thread.description}
                             </p>
-                            <div className="ml-2 flex-shrink-0">
+                            <div className="ml-2 shrink-0">
                               <div
                                 className={cn(
                                   "h-2 w-2 rounded-full",

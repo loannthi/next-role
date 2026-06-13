@@ -233,7 +233,7 @@ export const ToolCallBox = React.memo<ToolCallBoxProps>(
     return (
       <div
         className={cn(
-          "hover:border-primary/25 relative w-full overflow-hidden rounded-xl border border-border bg-tool-surface shadow-[0_1px_0_rgba(255,255,255,0.35)_inset] outline-none transition-all duration-200 hover:bg-tool-surface-hover",
+          "relative w-full overflow-hidden rounded-xl border border-border bg-tool-surface shadow-[0_1px_0_rgba(255,255,255,0.35)_inset] outline-hidden transition-all duration-200 hover:border-primary/25 hover:bg-tool-surface-hover",
           isExpanded && hasContent && "border-primary/20 bg-surface-raised",
           visualStatus === "pending" && "tool-running-sweep",
           visualStatus === "error" && "border-destructive/30"
@@ -245,14 +245,14 @@ export const ToolCallBox = React.memo<ToolCallBoxProps>(
           onPointerDown={handlePointerToggle}
           onClick={handleClickToggle}
           className={cn(
-            "relative z-10 flex h-auto w-full items-center justify-between gap-3 border-none px-3 py-3 text-left shadow-none outline-none focus-visible:ring-1 focus-visible:ring-primary/40 focus-visible:ring-offset-0 disabled:cursor-default"
+            "relative z-10 flex h-auto w-full items-center justify-between gap-3 border-none px-3 py-3 text-left shadow-none outline-hidden focus-visible:ring-1 focus-visible:ring-primary/40 focus-visible:ring-offset-0 disabled:cursor-default"
           )}
           disabled={!hasContent}
         >
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <span className="relative flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-primary">
               {visualStatus === "pending" && (
-                <span className="bg-primary/40 absolute size-2.5 animate-ping rounded-full" />
+                <span className="absolute size-2.5 animate-ping rounded-full bg-primary/40" />
               )}
               <ToolIcon size={16} className="relative" />
             </span>
@@ -263,7 +263,7 @@ export const ToolCallBox = React.memo<ToolCallBoxProps>(
                 </span>
                 <span
                   className={cn(
-                    "inline-flex shrink-0 items-center gap-1 rounded-full text-xs font-medium leading-none",
+                    "inline-flex shrink-0 items-center gap-1 rounded-full text-xs leading-none font-medium",
                     statusMeta.showLabel ? "border px-1.5 py-0.5" : "px-0.5 py-0",
                     statusMeta.className
                   )}
@@ -305,7 +305,7 @@ export const ToolCallBox = React.memo<ToolCallBoxProps>(
               <>
                 {Object.keys(args).length > 0 && (
                   <div className="mt-3">
-                    <h4 className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    <h4 className="mb-1 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                       Arguments
                     </h4>
                     <div className="space-y-2">
@@ -327,7 +327,7 @@ export const ToolCallBox = React.memo<ToolCallBoxProps>(
                           </button>
                           {expandedArgs[key] && (
                             <div className="border-t border-border bg-background/60 p-2">
-                              <pre className="m-0 overflow-x-auto whitespace-pre-wrap break-all font-mono text-xs leading-6 text-foreground">
+                              <pre className="m-0 overflow-x-auto font-mono text-xs leading-6 break-all whitespace-pre-wrap text-foreground">
                                 {typeof value === "string" ? value : JSON.stringify(value, null, 2)}
                               </pre>
                             </div>
@@ -339,10 +339,10 @@ export const ToolCallBox = React.memo<ToolCallBoxProps>(
                 )}
                 {result && (
                   <div className="mt-3">
-                    <h4 className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    <h4 className="mb-1 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                       Result
                     </h4>
-                    <pre className="m-0 overflow-x-auto whitespace-pre-wrap break-all rounded-lg border border-border bg-background/70 p-3 font-mono text-xs leading-7 text-foreground">
+                    <pre className="m-0 overflow-x-auto rounded-lg border border-border bg-background/70 p-3 font-mono text-xs leading-7 break-all whitespace-pre-wrap text-foreground">
                       {typeof result === "string" ? result : JSON.stringify(result, null, 2)}
                     </pre>
                   </div>
